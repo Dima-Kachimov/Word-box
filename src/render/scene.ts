@@ -7,7 +7,8 @@ import { world } from '../world/state';
 import { SUB, K } from '../world/constants';
 import { view } from './context';
 import { camera } from './camera';
-import { tileBuffer, lights } from './buffer';
+import { lights, worldImage, composeWorld, isHiDetail } from './buffer';
+import { drawVegetationHi } from './vegetation';
 import { clock } from '../sim/clock';
 import { particles } from '../sim/particles';
 import { clouds } from '../sim/clouds';
@@ -27,17 +28,18 @@ const glowSpr: HTMLCanvasElement = (() => {
 export function render(): void {
   const ctx = view.ctx, canvas = view.canvas;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.fillStyle = 'rgb(18,44,102)';
+  ctx.fillStyle = 'rgb(24,62,138)';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   const shx = clock.shake ? (rnd() - 0.5) * clock.shake : 0, shy = clock.shake ? (rnd() - 0.5) * clock.shake : 0;
   clock.shake *= 0.86; if (clock.shake < 0.3) clock.shake = 0;
   const ox = Math.round(camera.camX + shx), oy = Math.round(camera.camY + shy), z = camera.zoom;
-  // Рельєф масштабується зі згладжуванням — м'які переходи кольору замість
-  // чітких квадратів (менш "ретро-піксельний", ближче до мультяшного вигляду
-  // WorldBox). Персонажі/UI-спрайти нижче навмисно лишаються різкими.
+  const mw = Math.round(world.BW * z), mh = Math.round(world.BH * z);
+  // Мультяшна графіка — усе малюється зі згладжуванням.
   ctx.imageSmoothingEnabled = true;
-  ctx.drawImage(tileBuffer.canvas, ox, oy, Math.round(world.BW * z), Math.round(world.BH * z));
-  ctx.imageSmoothingEnabled = false;
+  const hi = isHiDetail();
+  if (hi !== worldImage.hi) composeWorld(hi);
+  ctx.drawImage(worldImage.canvas, ox, oy, mw, mh);
+  if (hi) drawVegetationHi(ctx, ox, oy, z, clock.frame, performance.now());
 
   // тіні хмар
   for (const cl of clouds) {
@@ -90,10 +92,8 @@ export function render(): void {
 
   // метеори
   for (const m of meteors) {
-    ctx.imageSmoothingEnabled = true;
     ctx.globalAlpha = 0.8;
     ctx.drawImage(glowSpr, ox + (m.x - 6 * K) * z, oy + (m.y - 6 * K) * z, 12 * K * z, 12 * K * z);
-    ctx.imageSmoothingEnabled = false;
     ctx.globalAlpha = 1;
     ctx.fillStyle = '#4a3a34'; ctx.fillRect(ox + (m.x - 1.5 * K) * z, oy + (m.y - 1.5 * K) * z, 3 * K * z, 3 * K * z);
     ctx.fillStyle = '#ffb347'; ctx.fillRect(ox + (m.x - 1.5 * K) * z, oy + (m.y + 0.5 * K) * z, 3 * K * z, K * z);
@@ -119,7 +119,6 @@ export function render(): void {
     ctx.fillStyle = `rgba(8,14,46,${clock.dark})`;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
     ctx.globalCompositeOperation = 'lighter';
-    ctx.imageSmoothingEnabled = true;
     const ga = Math.min(0.9, clock.dark * 1.5);
     const step = lights.length > 1500 ? 2 : 1;
     for (let k = 0; k < lights.length; k += 3 * step) {
@@ -131,7 +130,6 @@ export function render(): void {
     drawFireflies(ox, oy, z, clock.dark);
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
-    ctx.imageSmoothingEnabled = false;
   }
 
   // блискавки

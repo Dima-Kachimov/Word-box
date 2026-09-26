@@ -1,4 +1,4 @@
-import { world } from './state';
+import { world, markHeightDirtyCell, markHeightDirtyAll } from './state';
 import { fbm, clamp, rnd } from './noise';
 import {
   SUB, SEA, SAND, GRASS, HILL, B_TEMP, B_TUNDRA, B_DESERT, B_SAVANNA, B_JUNGLE, B_SWAMP,
@@ -32,6 +32,7 @@ export function isCold(i: number): boolean {
 export function setH(i: number, v: number): void {
   world.hgt[i] = clamp(v, 0, 1);
   world.biome[i] = calcBiome(i);
+  markHeightDirtyCell(i);
 }
 
 /**
@@ -70,8 +71,7 @@ export function allocateGrid(W: number, H: number): void {
   world.grazed = new Uint16Array(N);
   world.BW = W * SUB;
   world.BH = H * SUB;
-  world.noise = new Uint8Array(world.BW * world.BH);
-  for (let i = 0; i < world.noise.length; i++) world.noise[i] = (rnd() * 256) | 0;
+  markHeightDirtyAll();
 }
 
 /**
@@ -114,4 +114,5 @@ export function generateTerrain(): void {
     }
     if (tree) world.cover[i] = C_TREE;
   }
+  markHeightDirtyAll();
 }

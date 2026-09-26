@@ -41,8 +41,6 @@ export interface WorldState {
   /** Лічильник "витоптано/з'їдено" — трава тимчасово не росте й не годує. */
   grazed: Uint16Array;
 
-  /** Статичний шум на рівні пікселів текстурного буфера (для текстурування). */
-  noise: Uint8Array;
 }
 
 export const world: WorldState = {
@@ -57,9 +55,33 @@ export const world: WorldState = {
   moist: new Float32Array(0),
   biome: new Uint8Array(0),
   snow: new Uint16Array(0),
-  grazed: new Uint16Array(0),
-  noise: new Uint8Array(0)
+  grazed: new Uint16Array(0)
 };
+
+/**
+ * Прямокутник клітинок, у яких змінилась висота/біом з моменту останнього
+ * перемальовування рельєфу. Рельєф рендериться дорого (плавні береги), тож
+ * рендер перебудовує лише цю область. Світ нічого не знає про рендер —
+ * просто накопичує межі, а render/terrain.ts їх забирає й скидає.
+ */
+export const heightDirty = { x0: 0, y0: 0, x1: -1, y1: -1 };
+
+export function markHeightDirtyCell(i: number): void {
+  const x = i % world.W, y = (i / world.W) | 0;
+  if (heightDirty.x1 < heightDirty.x0) {
+    heightDirty.x0 = heightDirty.x1 = x; heightDirty.y0 = heightDirty.y1 = y;
+    return;
+  }
+  if (x < heightDirty.x0) heightDirty.x0 = x;
+  if (x > heightDirty.x1) heightDirty.x1 = x;
+  if (y < heightDirty.y0) heightDirty.y0 = y;
+  if (y > heightDirty.y1) heightDirty.y1 = y;
+}
+
+export function markHeightDirtyAll(): void {
+  heightDirty.x0 = 0; heightDirty.y0 = 0;
+  heightDirty.x1 = world.W - 1; heightDirty.y1 = world.H - 1;
+}
 
 export function tileAt(x: number, y: number): number {
   const ix = Math.floor(x), iy = Math.floor(y);

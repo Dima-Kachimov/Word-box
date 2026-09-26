@@ -10,8 +10,8 @@ import { DEEP, SEA, SAND, GRASS, HILL, ROCK } from '../world/constants';
 type RGB = [number, number, number];
 
 export const P = {
-  deep0: [18, 44, 102] as RGB, deep1: [28, 72, 150] as RGB,
-  sh0: [36, 96, 182] as RGB, sh1: [72, 152, 226] as RGB,
+  deep0: [24, 62, 138] as RGB, deep1: [36, 96, 182] as RGB,
+  sh0: [48, 128, 214] as RGB, sh1: [88, 176, 240] as RGB,
   sand0: [234, 216, 154] as RGB, sand1: [214, 190, 122] as RGB,
   tsand0: [196, 198, 188] as RGB, tsand1: [176, 178, 170] as RGB,
   rk0: [132, 128, 122] as RGB, rk1: [88, 86, 92] as RGB,
