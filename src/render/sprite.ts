@@ -14,12 +14,14 @@ export class LodSprite {
    * @param pad  поля навколо (щоб контури/хвости не обрізались)
    * @param draw малює в одиницях, початок координат — лівий верхній кут коробки w×h
    */
-  constructor(readonly w: number, readonly h: number, readonly pad: number, private draw: (g: CanvasRenderingContext2D) => void) {}
+  constructor(readonly w: number, readonly h: number, readonly pad: number, private draw: (g: CanvasRenderingContext2D) => void,
+    /** Найбільша роздільність (для великих м'яких спрайтів на кшталт хмар). */
+    private maxRes = Infinity) {}
 
   /** Canvas для масштабу z (екранних пікселів на одиницю). */
   pick(z: number): HTMLCanvasElement {
     let k = 0;
-    while (k < LOD_RES.length - 1 && LOD_RES[k] < z) k++;
+    while (k < LOD_RES.length - 1 && LOD_RES[k] < z && LOD_RES[k + 1] <= this.maxRes) k++;
     return this.lods[k] || (this.lods[k] = this.raster(LOD_RES[k]));
   }
 

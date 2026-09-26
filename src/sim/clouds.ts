@@ -3,7 +3,8 @@
 // світу лише для перетворення тайл↔піксель — самих клітинок не читає, крім
 // weatherTick(), де грозова хмара справді змінює землю під собою.
 
-import { rnd, lerp } from '../world/noise';
+import { rnd } from '../world/noise';
+import { LodSprite } from '../render/sprite';
 import { world } from '../world/state';
 import { SUB, K, SEA } from '../world/constants';
 import { isCold } from '../world/generate';
@@ -12,7 +13,7 @@ import { rainAt, snowAt, steamAt } from './particles';
 import { strike } from './events';
 import { C_ICE, C_FIRE, C_BURNT, C_LAVA } from '../world/constants';
 
-export interface CloudSprite { c: HTMLCanvasElement; s: HTMLCanvasElement; }
+export interface CloudSprite { c: LodSprite; s: LodSprite; }
 
 export interface Cloud {
   x: number; y: number; w: number; h: number;
@@ -26,28 +27,38 @@ export interface Cloud {
 
 export const clouds: Cloud[] = [];
 
+/** Мультяшна хмара: пухкі кружала з м'яким контуром, світлий верх, тінь знизу. */
 function makeCloud(w: number, h: number, storm: boolean): CloudSprite {
-  const c = document.createElement('canvas'); c.width = w; c.height = h;
-  const s = document.createElement('canvas'); s.width = w; s.height = h;
-  const g = c.getContext('2d')!, gs = s.getContext('2d')!;
-  const im = g.createImageData(w, h), ims = gs.createImageData(w, h);
   const blobs: { x: number; y: number; r: number }[] = [];
   const n = 4 + ((rnd() * 4) | 0);
   for (let k = 0; k < n; k++) blobs.push({ x: w * (0.18 + 0.64 * rnd()), y: h * (0.45 + 0.2 * rnd()), r: h * (0.3 + 0.22 * rnd()) });
-  const inside = (x: number, y: number) => blobs.some(b => (x - b.x) * (x - b.x) + (y - b.y) * (y - b.y) * 1.2 < b.r * b.r);
-  const top = storm ? [150, 156, 170] : [252, 253, 255];
-  const bot = storm ? [88, 94, 110] : [204, 212, 226];
-  const hi = storm ? [182, 188, 200] : [255, 255, 255];
-  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
-    if (!inside(x + 0.5, y + 0.5)) continue;
-    const t = y / h, q = (y * w + x) * 4;
-    let cc = [lerp(top[0], bot[0], t), lerp(top[1], bot[1], t), lerp(top[2], bot[2], t)];
-    if (!inside(x + 0.5, y - 0.5)) cc = hi;
-    else if (!inside(x + 0.5, y + 1.5)) cc = [cc[0] * 0.88, cc[1] * 0.88, cc[2] * 0.9];
-    im.data[q] = cc[0]; im.data[q + 1] = cc[1]; im.data[q + 2] = cc[2]; im.data[q + 3] = 255;
-    ims.data[q + 3] = 255;
-  }
-  g.putImageData(im, 0, 0); gs.putImageData(ims, 0, 0);
+  // рівненьке "дно" хмари
+  blobs.push({ x: w * 0.5, y: h * 0.66, r: h * 0.3 });
+  const ry = 1 / Math.sqrt(1.2);
+  const shape = (g: CanvasRenderingContext2D) => {
+    g.beginPath();
+    for (const b of blobs) { g.moveTo(b.x + b.r, b.y); g.ellipse(b.x, b.y, b.r, b.r * ry, 0, 0, Math.PI * 2); }
+    g.ellipse(w * 0.5, h * 0.7, w * 0.36, h * 0.2, 0, 0, Math.PI * 2);
+  };
+  const ink = storm ? '#3c4254' : '#8ea2c4';
+  const c = new LodSprite(w, h, 3, g => {
+    const gr = g.createLinearGradient(0, 0, 0, h);
+    gr.addColorStop(0, storm ? '#a4acbe' : '#ffffff');
+    gr.addColorStop(0.55, storm ? '#838ba0' : '#f4f8ff');
+    gr.addColorStop(1, storm ? '#555c70' : '#d2ddf0');
+    g.lineJoin = 'round';
+    shape(g); g.strokeStyle = ink; g.lineWidth = 1.8; g.stroke();
+    g.fillStyle = gr; g.fill();
+    g.save(); shape(g); g.clip();
+    // відблиски на верхівках кружал
+    g.fillStyle = storm ? 'rgba(210,216,230,0.45)' : 'rgba(255,255,255,0.9)';
+    for (const b of blobs) { g.beginPath(); g.ellipse(b.x - b.r * 0.25, b.y - b.r * 0.45, b.r * 0.45, b.r * 0.22, -0.3, 0, Math.PI * 2); g.fill(); }
+    // тінь по низу
+    g.fillStyle = storm ? 'rgba(30,34,50,0.35)' : 'rgba(120,145,190,0.25)';
+    g.beginPath(); g.ellipse(w * 0.5, h * 1.02, w * 0.5, h * 0.22, 0, 0, Math.PI * 2); g.fill();
+    g.restore();
+  }, 6);
+  const s = new LodSprite(w, h, 3, g => { shape(g); g.fillStyle = '#10142a'; g.fill(); }, 3);
   return { c, s };
 }
 
@@ -57,7 +68,7 @@ export function spawnAmbientCloud(initial?: boolean): void {
   if (initial) { x = rnd() * world.BW; y = rnd() * world.BH; }
   else if (Math.abs(clock.wx) >= Math.abs(clock.wy)) { x = clock.wx > 0 ? -w - 10 : world.BW + 10; y = rnd() * world.BH; }
   else { y = clock.wy > 0 ? -h - 20 : world.BH + 10; x = rnd() * world.BW; }
-  clouds.push({ x, y, w, h, sp: makeCloud(w, h, false), storm: false, spd: 0.1 + rnd() * 0.1, life: Infinity, age: 0, alpha: 0.55 });
+  clouds.push({ x, y, w, h, sp: makeCloud(w, h, false), storm: false, spd: 0.1 + rnd() * 0.1, life: Infinity, age: 0, alpha: 0.62 });
 }
 
 export function spawnStorm(tx: number, ty: number): void {

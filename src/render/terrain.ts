@@ -8,7 +8,7 @@
 // змінюється щотіку (сніг, згарище, вогонь, лава), живе в render/effects.ts.
 
 import { world, heightDirty } from '../world/state';
-import { SUB, SEA, DEEP, HILL } from '../world/constants';
+import { SUB, SEA, DEEP, SAND, GRASS, HILL, ROCK } from '../world/constants';
 import { terrainColor, col } from './palette';
 import { classifyBiome } from '../world/generate';
 
@@ -62,8 +62,79 @@ function sub(hv: number, tx: number, ty: number, a: number, b: number, c: number
 const SURF = SEA - 0.006;
 const SHALLOW = SEA - 0.03;
 
+/** Колір субпікселя з висотою hv (решта полів — з клітинок a b / c d). */
+function shadePixel(hv: number, a: number, b: number, c: number, d: number, wa: number, wb: number, wc: number, wd: number, tx: number, ty: number): void {
+  let R: number, G: number, B: number;
+  const { biome } = world;
+  if (hv < SEA) {
+    terrainColor(hv, 0);
+    R = col[0]; G = col[1]; B = col[2];
+    if (hv >= DEEP - 0.03) {
+      const tw = warm[a] * wa + warm[b] * wb + warm[c] * wc + warm[d] * wd;
+      R += (56 - R) * tw; G += (196 - G) * tw; B += (206 - B) * tw;
+    }
+    if (hv > SHALLOW) {
+      const t = (hv - SHALLOW) / (SEA - SHALLOW) * 0.45;
+      R += (150 - R) * t; G += (218 - G) * t; B += (248 - B) * t;
+    }
+    if (hv > SURF) {
+      const t = Math.min(1, (hv - SURF) / (SEA - SURF) * 1.6) * 0.85;
+      R += (240 - R) * t; G += (252 - G) * t; B += (255 - B) * t;
+    }
+  } else {
+    // Смуги висот (пісок/трава/пагорби/скелі/сніг) беруться з
+    // інтерпольованої висоти — межі між ними плавні криві. Палітра біома
+    // змішується за вагами сусідніх клітинок — біоми перетікають градієнтом.
+    const ba = biome[a], bb = biome[b], bc = biome[c], bd = biome[d];
+    if (ba === bb && ba === bc && ba === bd) {
+      terrainColor(hv, ba);
+      R = col[0]; G = col[1]; B = col[2];
+    } else {
+      // Межа біомів: класифікуємо сам субпіксель за інтерпольованими
+      // температурою/вологістю — ці поля плавні, тож межа виходить кривою,
+      // а не "сходинками" клітинок. Якщо клас не збігся з жодним сусідом
+      // (біом змінено інструментом) — м'яко змішуємо палітри.
+      // 2×2 суперсемплінг — межа згладжена, а не драбинка субпікселів.
+      const bs0 = sub(hv, tx - 0.25 / SUB, ty - 0.25 / SUB, a, b, c, d);
+      const bs1 = sub(hv, tx + 0.25 / SUB, ty - 0.25 / SUB, a, b, c, d);
+      const bs2 = sub(hv, tx - 0.25 / SUB, ty + 0.25 / SUB, a, b, c, d);
+      const bs3 = sub(hv, tx + 0.25 / SUB, ty + 0.25 / SUB, a, b, c, d);
+      const ok = (v: number) => v === ba || v === bb || v === bc || v === bd;
+      if (ok(bs0) && ok(bs1) && ok(bs2) && ok(bs3)) {
+        terrainColor(hv, bs0); R = col[0]; G = col[1]; B = col[2];
+        terrainColor(hv, bs1); R += col[0]; G += col[1]; B += col[2];
+        terrainColor(hv, bs2); R += col[0]; G += col[1]; B += col[2];
+        terrainColor(hv, bs3); R += col[0]; G += col[1]; B += col[2];
+        R *= 0.25; G *= 0.25; B *= 0.25;
+      } else {
+      terrainColor(hv, ba); R = col[0] * wa; G = col[1] * wa; B = col[2] * wa;
+      terrainColor(hv, bb); R += col[0] * wb; G += col[1] * wb; B += col[2] * wb;
+      terrainColor(hv, bc); R += col[0] * wc; G += col[1] * wc; B += col[2] * wc;
+      terrainColor(hv, bd); R += col[0] * wd; G += col[1] * wd; B += col[2] * wd;
+      }
+    }
+    const f = shadeF[a] * wa + shadeF[b] * wb + shadeF[c] * wc + shadeF[d] * wd;
+    R *= f; G *= f; B *= f;
+    if (hv > HILL && hv < HILL + 0.007) { R *= 0.84; G *= 0.84; B *= 0.86; }
+    if (hv < SEA + 0.008) {
+      const t = 1 - (hv - SEA) / 0.008;
+      R *= 1 - 0.3 * t; G *= 1 - 0.36 * t; B *= 1 - 0.42 * t;
+    }
+  }
+  oR = R; oG = G; oB = B;
+}
+
+let oR = 0, oG = 0, oB = 0;
+/** Пороги, на яких колір рельєфу стрибає, — на них потрібне згладжування. */
+const EDGES = [DEEP, SEA, SAND, GRASS, HILL, HILL + 0.007, ROCK];
+function band(h: number): number {
+  let n = 0;
+  for (let k = 0; k < EDGES.length; k++) if (h >= EDGES[k]) n++;
+  return n;
+}
+
 function renderPixels(cx0: number, cy0: number, cx1: number, cy1: number): void {
-  const { W, H, BW, hgt, biome } = world;
+  const { W, H, BW, hgt } = world;
   const data = terrainLayer.img.data;
   const px0 = cx0 * SUB, py0 = cy0 * SUB, px1 = (cx1 + 1) * SUB, py1 = (cy1 + 1) * SUB;
   for (let py = py0; py < py1; py++) {
@@ -84,61 +155,22 @@ function renderPixels(cx0: number, cy0: number, cx1: number, cy1: number): void 
       const a = r0 + x0, b = r0 + x1, c = r1 + x0, d = r1 + x1;
       const wa = (1 - tx) * (1 - ty), wb = tx * (1 - ty), wc = (1 - tx) * ty, wd = tx * ty;
       const hv = hgt[a] * wa + hgt[b] * wb + hgt[c] * wc + hgt[d] * wd;
+      // градієнт висоти на один субпіксель: якщо в межах пікселя висота
+      // перетинає поріг смуги (берег, сніг, скелі) — 2×2 суперсемплінг,
+      // інакше межа смуг виглядає драбинкою при наближенні
+      const gx = ((hgt[b] - hgt[a]) * (1 - ty) + (hgt[d] - hgt[c]) * ty) / SUB;
+      const gy = ((hgt[c] - hgt[a]) * (1 - tx) + (hgt[d] - hgt[b]) * tx) / SUB;
+      const e = (Math.abs(gx) + Math.abs(gy)) * 0.5;
       let R: number, G: number, B: number;
-      if (hv < SEA) {
-        terrainColor(hv, 0);
-        R = col[0]; G = col[1]; B = col[2];
-        if (hv >= DEEP - 0.03) {
-          const tw = warm[a] * wa + warm[b] * wb + warm[c] * wc + warm[d] * wd;
-          R += (56 - R) * tw; G += (196 - G) * tw; B += (206 - B) * tw;
-        }
-        if (hv > SHALLOW) {
-          const t = (hv - SHALLOW) / (SEA - SHALLOW) * 0.45;
-          R += (150 - R) * t; G += (218 - G) * t; B += (248 - B) * t;
-        }
-        if (hv > SURF) {
-          const t = Math.min(1, (hv - SURF) / (SEA - SURF) * 1.6) * 0.85;
-          R += (240 - R) * t; G += (252 - G) * t; B += (255 - B) * t;
-        }
+      if (band(hv - e) === band(hv + e)) {
+        shadePixel(hv, a, b, c, d, wa, wb, wc, wd, tx, ty); R = oR; G = oG; B = oB;
       } else {
-        // Смуги висот (пісок/трава/пагорби/скелі/сніг) беруться з
-        // інтерпольованої висоти — межі між ними плавні криві. Палітра біома
-        // змішується за вагами сусідніх клітинок — біоми перетікають градієнтом.
-        const ba = biome[a], bb = biome[b], bc = biome[c], bd = biome[d];
-        if (ba === bb && ba === bc && ba === bd) {
-          terrainColor(hv, ba);
-          R = col[0]; G = col[1]; B = col[2];
-        } else {
-          // Межа біомів: класифікуємо сам субпіксель за інтерпольованими
-          // температурою/вологістю — ці поля плавні, тож межа виходить кривою,
-          // а не "сходинками" клітинок. Якщо клас не збігся з жодним сусідом
-          // (біом змінено інструментом) — м'яко змішуємо палітри.
-          // 2×2 суперсемплінг — межа згладжена, а не драбинка субпікселів.
-          const bs0 = sub(hv, tx - 0.25 / SUB, ty - 0.25 / SUB, a, b, c, d);
-          const bs1 = sub(hv, tx + 0.25 / SUB, ty - 0.25 / SUB, a, b, c, d);
-          const bs2 = sub(hv, tx - 0.25 / SUB, ty + 0.25 / SUB, a, b, c, d);
-          const bs3 = sub(hv, tx + 0.25 / SUB, ty + 0.25 / SUB, a, b, c, d);
-          const ok = (v: number) => v === ba || v === bb || v === bc || v === bd;
-          if (ok(bs0) && ok(bs1) && ok(bs2) && ok(bs3)) {
-            terrainColor(hv, bs0); R = col[0]; G = col[1]; B = col[2];
-            terrainColor(hv, bs1); R += col[0]; G += col[1]; B += col[2];
-            terrainColor(hv, bs2); R += col[0]; G += col[1]; B += col[2];
-            terrainColor(hv, bs3); R += col[0]; G += col[1]; B += col[2];
-            R *= 0.25; G *= 0.25; B *= 0.25;
-          } else {
-          terrainColor(hv, ba); R = col[0] * wa; G = col[1] * wa; B = col[2] * wa;
-          terrainColor(hv, bb); R += col[0] * wb; G += col[1] * wb; B += col[2] * wb;
-          terrainColor(hv, bc); R += col[0] * wc; G += col[1] * wc; B += col[2] * wc;
-          terrainColor(hv, bd); R += col[0] * wd; G += col[1] * wd; B += col[2] * wd;
-          }
-        }
-        const f = shadeF[a] * wa + shadeF[b] * wb + shadeF[c] * wc + shadeF[d] * wd;
-        R *= f; G *= f; B *= f;
-        if (hv > HILL && hv < HILL + 0.007) { R *= 0.84; G *= 0.84; B *= 0.86; }
-        if (hv < SEA + 0.008) {
-          const t = 1 - (hv - SEA) / 0.008;
-          R *= 1 - 0.3 * t; G *= 1 - 0.36 * t; B *= 1 - 0.42 * t;
-        }
+        const qx = gx * 0.25, qy = gy * 0.25;
+        shadePixel(hv - qx - qy, a, b, c, d, wa, wb, wc, wd, tx, ty); R = oR; G = oG; B = oB;
+        shadePixel(hv + qx - qy, a, b, c, d, wa, wb, wc, wd, tx, ty); R += oR; G += oG; B += oB;
+        shadePixel(hv - qx + qy, a, b, c, d, wa, wb, wc, wd, tx, ty); R += oR; G += oG; B += oB;
+        shadePixel(hv + qx + qy, a, b, c, d, wa, wb, wc, wd, tx, ty); R += oR; G += oG; B += oB;
+        R *= 0.25; G *= 0.25; B *= 0.25;
       }
       const q = (py * BW + px) * 4;
       data[q] = R; data[q + 1] = G; data[q + 2] = B; data[q + 3] = 255;

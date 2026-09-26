@@ -4,7 +4,7 @@
 // (текстові піксель-карти оригіналу замінені мультяшною графікою).
 
 import { ART, ART_PAD } from './art';
-import { LodSprite } from './sprite';
+import { LodSprite } from '../render/sprite';
 import type { VoiceName } from '../audio/sfx';
 import { B_TEMP, B_TUNDRA, B_DESERT, B_SAVANNA, B_JUNGLE, B_SWAMP } from '../world/constants';
 

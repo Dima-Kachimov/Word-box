@@ -2,7 +2,7 @@
 // мультяшна бульбашка з контуром і хвостиком, всередині — символ.
 
 import { Painter, INK, TAU, volume } from '../render/cartoon';
-import { LodSprite } from './sprite';
+import { LodSprite } from '../render/sprite';
 
 /** Розмір бульбашки у світових пікселях. */
 export const EMO_W = 6, EMO_H = 6.4;

@@ -13,6 +13,8 @@ import { clock } from '../sim/clock';
 import { particles } from '../sim/particles';
 import { clouds } from '../sim/clouds';
 import { tornados, meteors, bolts, waves } from '../sim/events';
+import type { Tornado, Meteor } from '../sim/events';
+import { INK, TAU } from './cartoon';
 import { drawAnimals, drawFireflies } from '../creatures/render';
 import { uiState } from '../ui/state';
 import { shotCd } from '../sim/tools';
@@ -44,7 +46,7 @@ export function render(): void {
   // тіні хмар
   for (const cl of clouds) {
     ctx.globalAlpha = cl.alpha * 0.28;
-    ctx.drawImage(cl.sp.s, ox + (cl.x + 10 * K) * z, oy + (cl.y + 16 * K) * z, cl.w * z, cl.h * z);
+    cl.sp.s.blit(ctx, ox + (cl.x + 10 * K) * z, oy + (cl.y + 16 * K) * z, z);
   }
   ctx.globalAlpha = 1;
 
@@ -59,52 +61,20 @@ export function render(): void {
   drawAnimals(ox, oy, z, 'ground');
 
   // смерчі
-  for (const t of tornados) {
-    const a = Math.min(1, t.life / 60, (t.max - t.life) / 30);
-    const bx = t.x * SUB, by = t.y * SUB;
-    ctx.globalAlpha = 0.28 * a; ctx.fillStyle = '#000';
-    ctx.fillRect(ox + (bx - 4 * K) * z, oy + (by - K) * z, 8 * K * z, 3 * K * z);
-    for (let k = 0; k < 14; k++) {
-      const w = (2 + k * 0.85) * K, sway = Math.sin(t.ph + k * 0.45) * k * 0.35 * K, yy = by - k * 2.2 * K;
-      ctx.globalAlpha = 0.85 * a;
-      ctx.fillStyle = k % 2 ? '#c6ccd4' : '#e9ecf0';
-      ctx.fillRect(Math.round(ox + (bx - w / 2 + sway) * z), Math.round(oy + (yy - 2.2 * K) * z), Math.ceil(w * z), Math.ceil(2.3 * K * z));
-    }
-  }
+  for (const t of tornados) drawTornado(ctx, t, ox, oy, z);
   ctx.globalAlpha = 1;
 
-  // частинки
-  for (const p of particles) {
-    const a = p.life / p.max, sx = ox + p.x * z, sy = oy + p.y * z;
-    switch (p.kind) {
-      case 'rain': ctx.globalAlpha = 0.85; ctx.fillStyle = '#9fd4ff'; ctx.fillRect(sx, sy, Math.max(1, z * 0.6), z * 2.6); break;
-      case 'splash': ctx.globalAlpha = a; ctx.fillStyle = '#d8eeff'; ctx.fillRect(sx - z, sy, Math.max(1, z * 0.7), Math.max(1, z * 0.7)); ctx.fillRect(sx + z, sy, Math.max(1, z * 0.7), Math.max(1, z * 0.7)); break;
-      case 'snow': ctx.globalAlpha = Math.min(1, a * 1.5); ctx.fillStyle = '#ffffff'; ctx.fillRect(sx, sy, Math.max(1, z * 0.9), Math.max(1, z * 0.9)); break;
-      case 'smoke': { ctx.globalAlpha = 0.42 * a; ctx.fillStyle = '#666a6e'; const s = z * (1.5 + (1 - a) * 2.5); ctx.fillRect(sx, sy, s, s); break; }
-      case 'steam': { ctx.globalAlpha = 0.5 * a; ctx.fillStyle = '#eef3f7'; const s = z * (1.2 + (1 - a) * 2.5); ctx.fillRect(sx, sy, s, s); break; }
-      case 'ember': ctx.globalAlpha = a; ctx.fillStyle = a > 0.5 ? '#ffd24a' : '#ff6a1e'; ctx.fillRect(sx, sy, Math.max(1, z * 0.8), Math.max(1, z * 0.8)); break;
-      case 'spark': ctx.globalAlpha = a; ctx.fillStyle = p.c || '#fff'; ctx.fillRect(sx, sy, Math.max(1, z * 0.8), Math.max(1, z * 0.8)); break;
-      case 'dust': ctx.globalAlpha = 0.5 * a; ctx.fillStyle = '#c2ad86'; ctx.fillRect(sx, sy, z, z); break;
-      default: ctx.globalAlpha = Math.min(1, a * 1.4); ctx.fillStyle = p.c || '#fff'; ctx.fillRect(sx, sy, z, z);
-    }
-  }
-  ctx.globalAlpha = 1;
+  drawParticles(ctx, ox, oy, z);
 
   // метеори
-  for (const m of meteors) {
-    ctx.globalAlpha = 0.8;
-    ctx.drawImage(glowSpr, ox + (m.x - 6 * K) * z, oy + (m.y - 6 * K) * z, 12 * K * z, 12 * K * z);
-    ctx.globalAlpha = 1;
-    ctx.fillStyle = '#4a3a34'; ctx.fillRect(ox + (m.x - 1.5 * K) * z, oy + (m.y - 1.5 * K) * z, 3 * K * z, 3 * K * z);
-    ctx.fillStyle = '#ffb347'; ctx.fillRect(ox + (m.x - 1.5 * K) * z, oy + (m.y + 0.5 * K) * z, 3 * K * z, K * z);
-  }
+  for (const m of meteors) drawMeteor(ctx, m, ox, oy, z);
 
   drawAnimals(ox, oy, z, 'sky');
 
   // хмари
   for (const cl of clouds) {
     ctx.globalAlpha = cl.alpha;
-    ctx.drawImage(cl.sp.c, ox + cl.x * z, oy + cl.y * z, cl.w * z, cl.h * z);
+    cl.sp.c.blit(ctx, ox + cl.x * z, oy + cl.y * z, z);
   }
   ctx.globalAlpha = 1;
 
@@ -151,4 +121,127 @@ export function render(): void {
     ctx.arc(uiState.cursor.x, uiState.cursor.y, shotCd(uiState.tool) ? 6 * camera.dpr : (uiState.brushR + 0.5) * SUB * z, 0, Math.PI * 2);
     ctx.stroke();
   }
+}
+
+/** Смерч: вигнута воронка з контуром, закручені смуги й пилова хмарка біля землі. */
+function drawTornado(ctx: CanvasRenderingContext2D, t: Tornado, ox: number, oy: number, z: number): void {
+  const a = Math.min(1, t.life / 60, (t.max - t.life) / 30);
+  if (a <= 0) return;
+  const bx = t.x * SUB, by = t.y * SUB, N = 14;
+  ctx.globalAlpha = 0.28 * a; ctx.fillStyle = '#1a1020';
+  ctx.beginPath(); ctx.ellipse(ox + bx * z, oy + (by + 0.5 * K) * z, 5 * K * z, 1.6 * K * z, 0, 0, TAU); ctx.fill();
+  const cx: number[] = [], cy: number[] = [], hw: number[] = [];
+  for (let k = 0; k <= N; k++) {
+    cx.push(ox + (bx + Math.sin(t.ph + k * 0.45) * k * 0.35 * K) * z);
+    cy.push(oy + (by - k * 2.2 * K) * z);
+    hw.push((1 + k * 0.5 + (k * k) * 0.012) * K * z);
+  }
+  ctx.globalAlpha = 0.92 * a;
+  ctx.beginPath();
+  ctx.moveTo(cx[0] - hw[0], cy[0]);
+  for (let k = 1; k <= N; k++) ctx.lineTo(cx[k] - hw[k], cy[k]);
+  ctx.ellipse(cx[N], cy[N], hw[N], hw[N] * 0.3, 0, Math.PI, 0, false);
+  for (let k = N; k >= 0; k--) ctx.lineTo(cx[k] + hw[k], cy[k]);
+  ctx.closePath();
+  const gr = ctx.createLinearGradient(cx[N] - hw[N], 0, cx[N] + hw[N], 0);
+  gr.addColorStop(0, '#9ea6b4'); gr.addColorStop(0.35, '#eef1f5'); gr.addColorStop(1, '#8a92a2');
+  ctx.lineJoin = 'round';
+  ctx.strokeStyle = INK; ctx.lineWidth = Math.max(1.5, 0.9 * z); ctx.stroke();
+  ctx.fillStyle = gr; ctx.fill();
+  // закручені смуги
+  ctx.strokeStyle = 'rgba(90,98,116,0.7)'; ctx.lineWidth = Math.max(1, 0.5 * z); ctx.lineCap = 'round';
+  for (let k = 2; k < N; k += 2) {
+    const ph = (t.ph * 3 + k * 0.7) % TAU;
+    ctx.beginPath();
+    ctx.ellipse(cx[k], cy[k], hw[k] * 0.92, hw[k] * 0.28, 0, ph * 0.3, ph * 0.3 + Math.PI * 0.8);
+    ctx.stroke();
+  }
+  // пил біля основи
+  ctx.fillStyle = '#b8a888'; ctx.strokeStyle = INK; ctx.lineWidth = Math.max(1, 0.6 * z);
+  for (let k = 0; k < 4; k++) {
+    const ang = t.ph * 2 + k * 1.6, r = (1.2 + (k % 2) * 0.5) * K * z;
+    const px = cx[0] + Math.cos(ang) * 3.2 * K * z, py = cy[0] + Math.sin(ang) * 0.8 * K * z;
+    ctx.beginPath(); ctx.arc(px, py, r, 0, TAU); ctx.stroke(); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+/** Метеорит: палаючий хвіст-крапля і камінь з контуром. */
+function drawMeteor(ctx: CanvasRenderingContext2D, m: Meteor, ox: number, oy: number, z: number): void {
+  const dx = m.ex - m.sx, dy = m.ey - m.sy, L = Math.hypot(dx, dy) || 1, ux = dx / L, uy = dy / L;
+  const hx = ox + m.x * z, hy = oy + m.y * z, len = 26 * K * z, r = 2 * K * z;
+  ctx.globalAlpha = 0.8;
+  ctx.drawImage(glowSpr, hx - 7 * K * z, hy - 7 * K * z, 14 * K * z, 14 * K * z);
+  ctx.globalAlpha = 1;
+  const tx = hx - ux * len, ty = hy - uy * len, nx = -uy, ny = ux;
+  const trail = (w: number) => {
+    ctx.beginPath();
+    ctx.moveTo(tx, ty);
+    ctx.quadraticCurveTo(hx - ux * len * 0.3 + nx * w * 1.2, hy - uy * len * 0.3 + ny * w * 1.2, hx + nx * w, hy + ny * w);
+    ctx.arc(hx, hy, w, Math.atan2(ny, nx), Math.atan2(-ny, -nx), true);
+    ctx.quadraticCurveTo(hx - ux * len * 0.3 - nx * w * 1.2, hy - uy * len * 0.3 - ny * w * 1.2, tx, ty);
+  };
+  const g1 = ctx.createLinearGradient(tx, ty, hx, hy);
+  g1.addColorStop(0, 'rgba(255,90,20,0)'); g1.addColorStop(0.5, 'rgba(255,110,30,0.85)'); g1.addColorStop(1, '#ffb347');
+  trail(r * 1.9); ctx.fillStyle = g1; ctx.fill();
+  const g2 = ctx.createLinearGradient(tx, ty, hx, hy);
+  g2.addColorStop(0.3, 'rgba(255,230,120,0)'); g2.addColorStop(1, '#fff3b0');
+  trail(r * 1.15); ctx.fillStyle = g2; ctx.fill();
+  const gr = ctx.createRadialGradient(hx - r * 0.35, hy - r * 0.4, 0, hx, hy, r * 1.1);
+  gr.addColorStop(0, '#8a6a58'); gr.addColorStop(0.6, '#5a4238'); gr.addColorStop(1, '#2e201a');
+  ctx.beginPath(); ctx.arc(hx, hy, r, 0, TAU);
+  ctx.strokeStyle = INK; ctx.lineWidth = Math.max(1.5, 0.8 * z); ctx.stroke();
+  ctx.fillStyle = gr; ctx.fill();
+  ctx.fillStyle = '#ffd27a';
+  ctx.beginPath(); ctx.arc(hx + ux * r * 0.35, hy + uy * r * 0.35, r * 0.35, 0, TAU); ctx.fill();
+}
+
+/** Частинки: дощ — косі риски одним шляхом, решта — кружечки. */
+function drawParticles(ctx: CanvasRenderingContext2D, ox: number, oy: number, z: number): void {
+  const dot = (sx: number, sy: number, r: number) => {
+    if (r < 0.9) ctx.fillRect(sx - r, sy - r, r * 2, r * 2);
+    else { ctx.beginPath(); ctx.arc(sx, sy, r, 0, TAU); ctx.fill(); }
+  };
+  // дощ і сніг — пакетом
+  ctx.beginPath();
+  let rain = false;
+  for (const p of particles) {
+    if (p.kind !== 'rain') continue;
+    const sx = ox + p.x * z, sy = oy + p.y * z;
+    ctx.moveTo(sx, sy); ctx.lineTo(sx - p.vx * 1.4 * z, sy - p.vy * 1.4 * z);
+    rain = true;
+  }
+  if (rain) {
+    ctx.globalAlpha = 0.8; ctx.strokeStyle = '#a8dcff'; ctx.lineCap = 'round';
+    ctx.lineWidth = Math.max(1, z * 0.55); ctx.stroke();
+  }
+  ctx.globalAlpha = 0.95; ctx.fillStyle = '#ffffff';
+  ctx.beginPath();
+  const sr = Math.max(0.8, z * 0.6);
+  let snow = false;
+  for (const p of particles) {
+    if (p.kind !== 'snow') continue;
+    const sx = ox + p.x * z, sy = oy + p.y * z;
+    ctx.moveTo(sx + sr, sy); ctx.arc(sx, sy, sr, 0, TAU);
+    snow = true;
+  }
+  if (snow) ctx.fill();
+  for (const p of particles) {
+    const a = p.life / p.max, sx = ox + p.x * z, sy = oy + p.y * z;
+    switch (p.kind) {
+      case 'rain': case 'snow': break;
+      case 'splash': {
+        ctx.globalAlpha = a; ctx.strokeStyle = '#e4f4ff'; ctx.lineWidth = Math.max(1, z * 0.4);
+        ctx.beginPath(); ctx.ellipse(sx, sy, (1 + (1 - a) * 1.6) * z, (0.5 + (1 - a) * 0.6) * z, 0, 0, TAU); ctx.stroke();
+        break;
+      }
+      case 'smoke': ctx.globalAlpha = 0.42 * a; ctx.fillStyle = '#6a6e74'; dot(sx, sy, z * (0.9 + (1 - a) * 1.6)); break;
+      case 'steam': ctx.globalAlpha = 0.5 * a; ctx.fillStyle = '#eef3f7'; dot(sx, sy, z * (0.8 + (1 - a) * 1.6)); break;
+      case 'ember': ctx.globalAlpha = a; ctx.fillStyle = a > 0.5 ? '#ffd24a' : '#ff6a1e'; dot(sx, sy, Math.max(0.6, z * 0.45)); break;
+      case 'spark': ctx.globalAlpha = a; ctx.fillStyle = p.c || '#fff'; dot(sx, sy, Math.max(0.6, z * 0.45)); break;
+      case 'dust': ctx.globalAlpha = 0.5 * a; ctx.fillStyle = '#c2ad86'; dot(sx, sy, z * 0.6); break;
+      default: ctx.globalAlpha = Math.min(1, a * 1.4); ctx.fillStyle = p.c || '#fff'; dot(sx, sy, Math.max(0.6, z * 0.55));
+    }
+  }
+  ctx.globalAlpha = 1;
 }
