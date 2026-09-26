@@ -13,7 +13,12 @@ export function effTemp(i: number): number {
 }
 
 export function calcBiome(i: number): number {
-  const h = world.hgt[i], t = effTemp(i), m = world.moist[i];
+  return classifyBiome(world.hgt[i], world.temp[i], world.moist[i]);
+}
+
+/** Біом за висотою, температурою й вологістю (чиста функція — рендер кличе її для субпікселів). */
+export function classifyBiome(h: number, temp: number, m: number): number {
+  const t = temp - Math.max(0, h - 0.55) * 1.3;
   if (t < 0.28) return B_TUNDRA;
   if (t > 0.62) {
     if (m < 0.4) return B_DESERT;

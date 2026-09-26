@@ -7,7 +7,8 @@ import { view } from '../render/context';
 import { camera } from '../render/camera';
 import { animals, creatureState } from './animal';
 import type { Animal } from './types';
-import { EMO } from './emotes';
+import { EMO, EMO_W, EMO_H } from './emotes';
+import { ART_SCALE } from './species';
 
 export const STATE_TXT: Record<string, string> = {
   wander: 'Гуляє', eat: 'Їсть', toFood: 'Шукає їжу', drink: 'П\'є воду', toWater: 'Йде до води', sleep: 'Спить',
@@ -22,6 +23,12 @@ export const glowG: HTMLCanvasElement = (() => {
   g.fillStyle = gr; g.fillRect(0, 0, 32, 32);
   return c;
 })();
+
+function shadow(ctx: CanvasRenderingContext2D, x: number, y: number, rx: number, ry: number, alpha: number): void {
+  ctx.globalAlpha = alpha; ctx.fillStyle = '#1a1020';
+  ctx.beginPath(); ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2); ctx.fill();
+  ctx.globalAlpha = 1;
+}
 
 export function emoteOf(a: Animal): string | null {
   if (a.emoT > 0 && a.emo) return a.emo;
@@ -52,43 +59,36 @@ export function drawAnimals(ox: number, oy: number, z: number, pass: 'ground' | 
     if (S.key === 'eagle') f = a.state === 'dive' ? 1 : Math.floor(a.t) % 4 === 0 ? 1 : 0;
     const scale = a.baby > 0 ? 0.6 : 1, w = S.w * scale, h = S.h * scale;
     const dx = bx - w / 2;
-    let dy = by - h + 1;
+    let dy = by - h + 0.6;
     if (S.hop && moving) dy -= Math.abs(Math.sin(a.t * 1.6)) * 2;
-    if ((a.state === 'eat' || a.state === 'drink' || a.state === 'feast') && (fc >> 3) % 2) dy += 1;
+    if ((a.state === 'eat' || a.state === 'drink' || a.state === 'feast') && (fc >> 3) % 2) dy += 0.6;
     if (S.kind === 'sea') {
       const i = tileAt(a.x, a.y);
       if (i >= 0 && world.cover[i] === C_ICE) continue;
       if (a.jump) { dy -= Math.sin(a.jump * Math.PI) * 10; ctx.globalAlpha = 1; }
-      else ctx.globalAlpha = S.key === 'whale' ? 0.82 : 0.66;
+      else ctx.globalAlpha = S.key === 'whale' ? 0.82 : 0.7;
     } else if (S.kind === 'sky') {
       const alt = a.alt !== undefined ? a.alt : S.alt!;
-      ctx.globalAlpha = 0.2; ctx.fillStyle = '#000';
-      ctx.fillRect(Math.round(ox + (dx + 2) * z), Math.round(oy + (by + 2) * z), Math.max(1, Math.round((w - 1) * z)), Math.max(1, Math.round(z * 1.5)));
-      dy -= alt; ctx.globalAlpha = 1;
+      shadow(ctx, ox + (bx + 2) * z, oy + (by + 2) * z, w * 0.4 * z, w * 0.14 * z, 0.18);
+      dy -= alt;
     } else {
-      ctx.globalAlpha = 0.25; ctx.fillStyle = '#000';
-      ctx.fillRect(Math.round(ox + (dx + 1) * z), Math.round(oy + by * z), Math.max(1, Math.round((w - 2) * z)), Math.max(1, Math.round(z * 1.5)));
-      ctx.globalAlpha = 1;
+      shadow(ctx, ox + bx * z, oy + (by + 0.2) * z, w * 0.42 * z, Math.max(w * 0.12, 1) * z, 0.26);
     }
     if (a.z) dy -= a.z;
-    const flip = a.state === 'tossed' ? (Math.floor(a.t) % 2) : (a.dir < 0 ? 1 : 0);
+    const flip = a.state === 'tossed' ? (Math.floor(a.t) % 2) === 1 : a.dir < 0;
     const lying = S.lie && (a.state === 'sleep' || a.state === 'rest' || a.state === 'lurk');
-    const img = lying ? S.lie![a.pal][flip] : S.imgs[a.pal][f][flip];
-    ctx.drawImage(img, Math.round(ox + dx * z), Math.round(oy + dy * z), Math.max(1, Math.round(w * z)), Math.max(1, Math.round(h * z)));
+    const img = lying ? S.lie![a.pal] : S.imgs[a.pal][f];
+    img.blit(ctx, ox + dx * z, oy + dy * z, ART_SCALE * scale * z, flip);
     ctx.globalAlpha = 1;
     if (a === creatureState.selected) {
-      ctx.strokeStyle = '#ffe45c'; ctx.lineWidth = Math.max(1, z * 0.6);
-      ctx.beginPath(); ctx.ellipse(ox + bx * z, oy + (by + 0.5) * z, (w * 0.6 + 1) * z, 2.5 * z, 0, 0, Math.PI * 2); ctx.stroke();
+      ctx.strokeStyle = '#ffe45c'; ctx.lineWidth = Math.max(1.5, z * 0.6);
+      ctx.beginPath(); ctx.ellipse(ox + bx * z, oy + (by + 0.3) * z, (w * 0.6 + 1) * z, (w * 0.18 + 1.2) * z, 0, 0, Math.PI * 2); ctx.stroke();
     }
     if (showEmo || a === creatureState.selected) {
       const e = emoteOf(a);
       if (e) {
-        const img2 = EMO[e], ew = img2.width, eh = img2.height;
-        const ex = bx - ew / 2, ey = dy - eh - 2 - ((fc >> 4) % 2);
-        ctx.globalAlpha = 0.55; ctx.fillStyle = '#000';
-        ctx.fillRect(Math.round(ox + (ex - 1) * z), Math.round(oy + (ey - 1) * z), Math.round((ew + 2) * z), Math.round((eh + 2) * z));
-        ctx.globalAlpha = 1;
-        ctx.drawImage(img2, Math.round(ox + ex * z), Math.round(oy + ey * z), Math.round(ew * z), Math.round(eh * z));
+        const ex = bx - EMO_W / 2 + a.dir * w * 0.2, ey = dy - EMO_H - 0.5 - ((fc >> 4) % 2) * 0.6;
+        EMO[e].blit(ctx, ox + ex * z, oy + ey * z, z);
       }
     }
   }
@@ -105,7 +105,7 @@ export function drawFireflies(ox: number, oy: number, z: number, dark: number): 
     ctx.globalAlpha = b * Math.min(1, dark * 1.8);
     ctx.drawImage(glowG, sx - 4 * z, sy - 4 * z, 8 * z, 8 * z);
     ctx.fillStyle = '#f4ffb0';
-    ctx.fillRect(sx - z * 0.5, sy - z * 0.5, Math.max(1, z), Math.max(1, z));
+    ctx.beginPath(); ctx.arc(sx, sy, Math.max(1, z * 0.6), 0, Math.PI * 2); ctx.fill();
   }
   ctx.globalAlpha = 1;
 }

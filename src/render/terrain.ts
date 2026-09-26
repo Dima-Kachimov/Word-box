@@ -10,6 +10,7 @@
 import { world, heightDirty } from '../world/state';
 import { SUB, SEA, DEEP, HILL } from '../world/constants';
 import { terrainColor, col } from './palette';
+import { classifyBiome } from '../world/generate';
 
 export const terrainLayer = {
   canvas: null as unknown as HTMLCanvasElement,
@@ -47,6 +48,15 @@ function computeCell(x: number, y: number): void {
   const slope = (h(x + 1, y + 1) - h(x - 1, y - 1)) * 0.6 + (h(x + 2, y + 2) - h(x - 2, y - 2)) * 0.2;
   shadeF[i] = 1 + Math.max(-0.14, Math.min(0.14, slope * 3.5));
   warm[i] = Math.max(0, Math.min(1, (world.temp[i] - 0.58) * 3)) * 0.3;
+}
+
+/** Біом у точці (tx,ty) всередині квадрата клітинок a b / c d. */
+function sub(hv: number, tx: number, ty: number, a: number, b: number, c: number, d: number): number {
+  const { temp, moist } = world;
+  const wa = (1 - tx) * (1 - ty), wb = tx * (1 - ty), wc = (1 - tx) * ty, wd = tx * ty;
+  return classifyBiome(hv,
+    temp[a] * wa + temp[b] * wb + temp[c] * wc + temp[d] * wd,
+    moist[a] * wa + moist[b] * wb + moist[c] * wc + moist[d] * wd);
 }
 
 const SURF = SEA - 0.006;
@@ -99,10 +109,28 @@ function renderPixels(cx0: number, cy0: number, cx1: number, cy1: number): void 
           terrainColor(hv, ba);
           R = col[0]; G = col[1]; B = col[2];
         } else {
+          // Межа біомів: класифікуємо сам субпіксель за інтерпольованими
+          // температурою/вологістю — ці поля плавні, тож межа виходить кривою,
+          // а не "сходинками" клітинок. Якщо клас не збігся з жодним сусідом
+          // (біом змінено інструментом) — м'яко змішуємо палітри.
+          // 2×2 суперсемплінг — межа згладжена, а не драбинка субпікселів.
+          const bs0 = sub(hv, tx - 0.25 / SUB, ty - 0.25 / SUB, a, b, c, d);
+          const bs1 = sub(hv, tx + 0.25 / SUB, ty - 0.25 / SUB, a, b, c, d);
+          const bs2 = sub(hv, tx - 0.25 / SUB, ty + 0.25 / SUB, a, b, c, d);
+          const bs3 = sub(hv, tx + 0.25 / SUB, ty + 0.25 / SUB, a, b, c, d);
+          const ok = (v: number) => v === ba || v === bb || v === bc || v === bd;
+          if (ok(bs0) && ok(bs1) && ok(bs2) && ok(bs3)) {
+            terrainColor(hv, bs0); R = col[0]; G = col[1]; B = col[2];
+            terrainColor(hv, bs1); R += col[0]; G += col[1]; B += col[2];
+            terrainColor(hv, bs2); R += col[0]; G += col[1]; B += col[2];
+            terrainColor(hv, bs3); R += col[0]; G += col[1]; B += col[2];
+            R *= 0.25; G *= 0.25; B *= 0.25;
+          } else {
           terrainColor(hv, ba); R = col[0] * wa; G = col[1] * wa; B = col[2] * wa;
           terrainColor(hv, bb); R += col[0] * wb; G += col[1] * wb; B += col[2] * wb;
           terrainColor(hv, bc); R += col[0] * wc; G += col[1] * wc; B += col[2] * wc;
           terrainColor(hv, bd); R += col[0] * wd; G += col[1] * wd; B += col[2] * wd;
+          }
         }
         const f = shadeF[a] * wa + shadeF[b] * wb + shadeF[c] * wc + shadeF[d] * wd;
         R *= f; G *= f; B *= f;

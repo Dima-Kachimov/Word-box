@@ -30,13 +30,13 @@ export function spawnAnimal(k: string, x: number, y: number, extra?: Partial<Ani
   const a: Animal = {
     S, x, y, vx: 0, vy: 0, dir: rnd() < 0.5 ? -1 : 1, t: rnd() * 10, timer: 0,
     think: (rnd() * 30) | 0, state: 'wander', z: 0, vz: 0,
-    pal: (rnd() * S.pals.length) | 0, hunger: rnd() * 0.35, thirst: rnd() * 0.35,
+    pal: (rnd() * S.pals) | 0, hunger: rnd() * 0.35, thirst: rnd() * 0.35,
     stam: S.stam || 100, phase: rnd() * 6.28, id: creatureState.aid++,
     hx: x, hy: y, baby: 0, jump: 0, age: (S.adult || 0) + rnd() * 20000,
     life: 32000 + rnd() * 50000, mateCd: rnd() * 1500, stuck: 0, emoT: 0, wa: rnd() * 6.28
   };
   if (extra) Object.assign(a, extra);
-  if (a.pal >= S.pals.length) a.pal = 0;
+  if (a.pal >= S.pals) a.pal = 0;
   animals.push(a);
   return a;
 }

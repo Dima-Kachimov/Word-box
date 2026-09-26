@@ -2,11 +2,11 @@
 // витоптана трава, згарище, базальт, лава, палаюча земля.
 //
 // Спершу для кожної клітинки рахується колір і прозорість (композиція
-// ефектів), потім шар растеризується з ER субпікселями на клітинку:
-// колір інтерполюється білінійно, а прозорість додатково "загострюється"
-// (smoothstep відносно найсильнішого сусіда) — тому край снігової шапки чи
-// згарища виходить плавною кривою, як берегова лінія, а не драбинкою з
-// квадратів. Щотіку перераховуються лише плитки, де колір клітинок справді
+// ефектів). Потім поле розмивається (3×3), і шар растеризується з ER
+// субпікселями на клітинку: форма береться з розмитого поля, "загостреного"
+// smoothstep-ом відносно найсильнішого сусіда. Розмиття згладжує драбинку
+// клітинок, тож край снігової шапки чи згарища виходить плавною кривою, як
+// берегова лінія, а не квадратами з заокругленими кутами. Щотіку перераховуються лише плитки, де колір клітинок справді
 // змінився (горіння, танення краю снігу тощо) — решта шару не чіпається.
 
 import { world } from '../world/state';
@@ -34,6 +34,10 @@ export const viewBounds = { x0: 0, y0: 0, x1: 0, y1: 0 };
 let pr = new Float32Array(0), pg = new Float32Array(0), pb = new Float32Array(0), pa = new Float32Array(0);
 /** Квантований колір клітинки з минулого тіку — щоб бачити, що змінилось. */
 let prev = new Uint32Array(0);
+// Розмите поле (premultiplied), максимум розмитої прозорості і максимум
+// справжньої прозорості в околі 3×3 — для форми й сили ефекту.
+let br = new Float32Array(0), bg = new Float32Array(0), bb = new Float32Array(0), ba = new Float32Array(0);
+let mB = new Float32Array(0), mA = new Float32Array(0), tmp = new Float32Array(0);
 let tilesW = 0, tilesH = 0, dirtyTiles = new Uint8Array(0), firstRun = true;
 
 export function setupEffects(): void {
@@ -46,14 +50,18 @@ export function setupEffects(): void {
   pr = new Float32Array(world.N); pg = new Float32Array(world.N);
   pb = new Float32Array(world.N); pa = new Float32Array(world.N);
   prev = new Uint32Array(world.N);
+  br = new Float32Array(world.N); bg = new Float32Array(world.N);
+  bb = new Float32Array(world.N); ba = new Float32Array(world.N);
+  mB = new Float32Array(world.N); mA = new Float32Array(world.N); tmp = new Float32Array(world.N);
   tilesW = Math.ceil(world.W / TILE); tilesH = Math.ceil(world.H / TILE);
   dirtyTiles = new Uint8Array(tilesW * tilesH);
   firstRun = true;
 }
 
 function markTileAround(x: number, y: number): void {
-  const tx0 = Math.max(0, ((x - 1) / TILE) | 0), tx1 = Math.min(tilesW - 1, ((x + 1) / TILE) | 0);
-  const ty0 = Math.max(0, ((y - 1) / TILE) | 0), ty1 = Math.min(tilesH - 1, ((y + 1) / TILE) | 0);
+  // клітинка впливає на розмите поле й максимуми в радіусі 2, плюс білінійка
+  const tx0 = Math.max(0, ((x - 3) / TILE) | 0), tx1 = Math.min(tilesW - 1, ((x + 3) / TILE) | 0);
+  const ty0 = Math.max(0, ((y - 3) / TILE) | 0), ty1 = Math.min(tilesH - 1, ((y + 3) / TILE) | 0);
   for (let ty = ty0; ty <= ty1; ty++) for (let tx = tx0; tx <= tx1; tx++) dirtyTiles[ty * tilesW + tx] = 1;
 }
 
@@ -106,6 +114,40 @@ function computeCells(frame: number): void {
   }
 }
 
+/** Розмиття 1-2-1 по обох осях: src → dst. */
+function blur(src: Float32Array, dst: Float32Array): void {
+  const { W, H } = world;
+  for (let y = 0; y < H; y++) {
+    const r = y * W;
+    for (let x = 0; x < W; x++) {
+      const l = src[r + (x > 0 ? x - 1 : x)], c = src[r + x], rr = src[r + (x < W - 1 ? x + 1 : x)];
+      tmp[r + x] = (l + 2 * c + rr) * 0.25;
+    }
+  }
+  for (let y = 0; y < H; y++) {
+    const ru = (y > 0 ? y - 1 : y) * W, r = y * W, rd = (y < H - 1 ? y + 1 : y) * W;
+    for (let x = 0; x < W; x++) dst[r + x] = (tmp[ru + x] + 2 * tmp[r + x] + tmp[rd + x]) * 0.25;
+  }
+}
+/** Максимум в околі 3×3: src → dst. */
+function max3(src: Float32Array, dst: Float32Array): void {
+  const { W, H } = world;
+  for (let y = 0; y < H; y++) {
+    const r = y * W;
+    for (let x = 0; x < W; x++) {
+      const l = src[r + (x > 0 ? x - 1 : x)], c = src[r + x], rr = src[r + (x < W - 1 ? x + 1 : x)];
+      tmp[r + x] = l > c ? (l > rr ? l : rr) : (c > rr ? c : rr);
+    }
+  }
+  for (let y = 0; y < H; y++) {
+    const ru = (y > 0 ? y - 1 : y) * W, r = y * W, rd = (y < H - 1 ? y + 1 : y) * W;
+    for (let x = 0; x < W; x++) {
+      const u = tmp[ru + x], c = tmp[r + x], d = tmp[rd + x];
+      dst[r + x] = u > c ? (u > d ? u : d) : (c > d ? c : d);
+    }
+  }
+}
+
 function rasterize(cx0: number, cy0: number, cx1: number, cy1: number): void {
   const { W, H } = world;
   const data = effectLayer.img.data, EW = W * ER;
@@ -127,26 +169,29 @@ function rasterize(cx0: number, cy0: number, cx1: number, cy1: number): void {
       if (x0 < 0) x0 = 0;
       if (x1 >= W) x1 = W - 1;
       const a = r0 + x0, b = r0 + x1, c = r1 + x0, d = r1 + x1;
-      const aa = pa[a], ab = pa[b], ac = pa[c], ad = pa[d];
-      if (aa + ab + ac + ad === 0) { data[q + 3] = 0; continue; }
+      if (mA[a] + mA[b] + mA[c] + mA[d] === 0) { data[q + 3] = 0; continue; }
       const wa = (1 - tx) * (1 - ty), wb = tx * (1 - ty), wc = (1 - tx) * ty, wd = tx * ty;
-      const al = aa * wa + ab * wb + ac * wc + ad * wd;
-      const amax = Math.max(aa, ab, ac, ad);
+      const al = ba[a] * wa + ba[b] * wb + ba[c] * wc + ba[d] * wd;
+      if (al <= 1e-4) { data[q + 3] = 0; continue; }
+      const ml = mB[a] * wa + mB[b] * wb + mB[c] * wc + mB[d] * wd;
       // "загострення": плавний, але вузький перехід навколо половини сили
-      let k = al / amax;
-      k = k <= 0.3 ? 0 : k >= 0.7 ? 1 : (k - 0.3) / 0.4;
+      let k = al / ml;
+      k = k <= 0.38 ? 0 : k >= 0.62 ? 1 : (k - 0.38) / 0.24;
       k = k * k * (3 - 2 * k);
-      const inv = 1 / al;
-      data[q] = (pr[a] * wa + pr[b] * wb + pr[c] * wc + pr[d] * wd) * inv;
-      data[q + 1] = (pg[a] * wa + pg[b] * wb + pg[c] * wc + pg[d] * wd) * inv;
-      data[q + 2] = (pb[a] * wa + pb[b] * wb + pb[c] * wc + pb[d] * wd) * inv;
-      data[q + 3] = amax * k * 255;
+      // темніший "обідок" по краю плями — мультяшний контур снігу/згарища
+      const inv = (1 - 0.34 * 4 * k * (1 - k)) / al;
+      data[q] = (br[a] * wa + br[b] * wb + br[c] * wc + br[d] * wd) * inv;
+      data[q + 1] = (bg[a] * wa + bg[b] * wb + bg[c] * wc + bg[d] * wd) * inv;
+      data[q + 2] = (bb[a] * wa + bb[b] * wb + bb[c] * wc + bb[d] * wd) * inv;
+      data[q + 3] = (mA[a] * wa + mA[b] * wb + mA[c] * wc + mA[d] * wd) * k * 255;
     }
   }
 }
 
 export function updateEffects(frame: number): void {
   computeCells(frame);
+  blur(pr, br); blur(pg, bg); blur(pb, bb); blur(pa, ba);
+  max3(ba, mB); max3(pa, mA);
   const { W, H } = world;
   if (firstRun) { dirtyTiles.fill(1); firstRun = false; }
   for (let t = 0; t < dirtyTiles.length; t++) {
