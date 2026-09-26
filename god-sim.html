@@ -1,0 +1,2201 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Пісочниця Творця</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bar: #2b2e27; --panel: #3e4238; --panel-dark: #2a2d25; --edge: #161813;
+    --hi: #5b604f; --ink: #f1efe4; --ink-dim: #b9b8a6;
+    --active: #c9402b; --active-hi: #ff6a4d; --active-lo: #7e2416; --sea: #122c66;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) { --bar: #2b2e27; --ink: #f1efe4; } }
+  :root[data-theme="dark"] { --bar: #2b2e27; --ink: #f1efe4; }
+  html, body {
+    height: 100%; margin: 0; background: var(--bar); color: var(--ink);
+    font-family: 'Press Start 2P', ui-monospace, 'Courier New', monospace;
+    overflow: hidden; overscroll-behavior: none;
+    user-select: none; -webkit-user-select: none; -webkit-tap-highlight-color: transparent;
+  }
+  #app { display: flex; flex-direction: column; height: 100%; }
+  header {
+    display: flex; align-items: center; justify-content: space-between; gap: 6px;
+    padding: 7px 8px; background: var(--bar); border-bottom: 3px solid var(--edge); flex-shrink: 0;
+  }
+  h1 { font-size: 9px; margin: 0; line-height: 1.6; text-shadow: 2px 2px 0 #000; }
+  .hbtns { display: flex; gap: 5px; }
+  .hbtn {
+    width: 34px; height: 34px; padding: 0; cursor: pointer;
+    background: var(--panel); color: var(--ink); font-family: inherit; font-size: 11px;
+    border: 2px solid var(--edge);
+    box-shadow: inset 2px 2px 0 var(--hi), inset -2px -2px 0 var(--panel-dark);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .hbtn.on { background: var(--active); box-shadow: inset 2px 2px 0 var(--active-hi), inset -2px -2px 0 var(--active-lo); }
+  #canvasWrap { flex: 1; position: relative; min-height: 0; background: var(--sea); overflow: hidden; }
+  canvas#world { position: absolute; top: 0; left: 0; touch-action: none; display: block; }
+  #toast {
+    position: absolute; left: 50%; top: 10px; transform: translateX(-50%);
+    background: rgba(18,20,16,.88); border: 2px solid var(--edge);
+    padding: 7px 10px; font-size: 7px; line-height: 1.7; color: var(--ink);
+    pointer-events: none; white-space: nowrap; transition: opacity .4s; opacity: 0;
+  }
+  #hud {
+    position: absolute; left: 8px; bottom: 8px; display: flex; gap: 10px; align-items: center;
+    background: rgba(18,20,16,.82); border: 2px solid var(--edge); padding: 6px 9px;
+    font-size: 7px; pointer-events: none;
+  }
+  #windArrow { display: inline-block; font-size: 10px; line-height: 1; transition: transform .6s; }
+  footer { background: var(--panel); border-top: 3px solid var(--edge); padding: 6px 6px 8px; flex-shrink: 0; }
+  .tabs { display: flex; gap: 4px; max-width: 560px; margin: 0 auto 6px; }
+  .tab {
+    flex: 1; min-width: 0; height: 30px; display: flex; align-items: center; justify-content: center; gap: 4px;
+    background: var(--panel-dark); color: var(--ink-dim); font-family: inherit; font-size: 6px; cursor: pointer;
+    border: 2px solid var(--edge); box-shadow: inset 2px 2px 0 #4b4f42, inset -2px -2px 0 #1d1f19; padding: 0 2px;
+  }
+  .tab canvas { width: 20px; height: 20px; image-rendering: pixelated; }
+  #insp { position: absolute; left: 8px; top: 46px; display: none; background: rgba(18,20,16,.9); border: 2px solid var(--edge); padding: 8px 10px; font-size: 7px; line-height: 2; max-width: 62%; pointer-events: none; }
+  #insp b { color: #ffe45c; font-weight: normal; }
+  .bar { display: inline-block; width: 64px; height: 6px; background: #1a1a18; border: 1px solid #000; vertical-align: middle; margin-left: 6px; }
+  .bar i { display: block; height: 100%; }
+  .tools { display: grid; grid-template-columns: repeat(6, 1fr); gap: 4px; max-width: 560px; margin: 0 auto; }
+  .tool {
+    background: var(--panel-dark); color: var(--ink-dim); font-family: inherit; cursor: pointer;
+    border: 2px solid var(--edge);
+    box-shadow: inset 2px 2px 0 #4b4f42, inset -2px -2px 0 #1d1f19;
+    padding: 6px 0 5px; display: flex; flex-direction: column; align-items: center; gap: 5px;
+  }
+  .tool canvas { width: 28px; height: 28px; image-rendering: pixelated; }
+  .tool span { font-size: 7px; }
+  .tool.active, .tab.active { background: var(--active); color: #fff; box-shadow: inset 2px 2px 0 var(--active-hi), inset -2px -2px 0 var(--active-lo); }
+  .tool:focus-visible, .hbtn:focus-visible, .tab:focus-visible { outline: 2px solid #fff; outline-offset: 1px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>ПІСОЧНИЦЯ<br>ТВОРЦЯ</h1>
+    <div class="hbtns">
+      <button class="hbtn" id="panBtn" title="Рухати карту">✋</button>
+      <button class="hbtn" id="brushBtn" title="Розмір пензля">M</button>
+      <button class="hbtn on" id="dayBtn" title="День і ніч">☀</button>
+      <button class="hbtn" id="soundBtn" title="Звук">🔊</button>
+      <button class="hbtn" id="pauseBtn" title="Пауза">❚❚</button>
+      <button class="hbtn" id="regenBtn" title="Новий світ">↻</button>
+    </div>
+  </header>
+  <div id="canvasWrap">
+    <canvas id="world"></canvas>
+    <div id="toast"></div>
+    <div id="insp"></div>
+    <div id="hud"><span id="timeLbl">☀ 12:00</span><span>Вітер <span id="windArrow">➤</span></span><span id="animalLbl">🐾 0</span></div>
+  </div>
+  <footer>
+    <div class="tabs" id="tabs"></div>
+    <div class="tools" id="toolbar"></div>
+  </footer>
+</div>
+
+<script>
+(function () {
+  const wrap = document.getElementById('canvasWrap');
+  const canvas = document.getElementById('world');
+  const ctx = canvas.getContext('2d');
+  const toastEl = document.getElementById('toast');
+  const timeLbl = document.getElementById('timeLbl');
+  const windArrow = document.getElementById('windArrow');
+  const animalLbl = document.getElementById('animalLbl');
+
+  // ================= constants =================
+  const SUB = 6;
+  const K = SUB / 4;
+  const DEEP = 0.27, SEA = 0.36, SAND = 0.395, GRASS = 0.60, HILL = 0.70, ROCK = 0.86;
+  const C_NONE = 0, C_TREE = 1, C_FIRE = 2, C_BURNT = 3, C_ICE = 4, C_LAVA = 5, C_BASALT = 6;
+  const B_TEMP = 0, B_TUNDRA = 1, B_DESERT = 2, B_SAVANNA = 3, B_JUNGLE = 4, B_SWAMP = 5;
+  const GROW = [0.0008, 0.0004, 0.00015, 0.0003, 0.002, 0.0008];
+  const TICK = 150;
+
+  let W, H, N, hgt, cover, timer, wet, vari, lit, temp, moist, biome, snow, grazed;
+  let buf, bctx, img, data, noise, BW, BH;
+  let seed = 0, frame = 0, dirty = true, paused = false;
+  let dpr = 1, zoom = 1, minZoom = 1, maxZoom = 10, camX = 0, camY = 0;
+  let tool = 'rain', brushR = 3;
+  let tod = 0.05, dayCycle = true, dark = 0, warm = 0;
+  let windA = Math.random() * Math.PI * 2, windS = 0.8, wx = 1, wy = 0;
+  let shake = 0, flash = 0;
+  const particles = [], clouds = [], tornados = [], meteors = [], bolts = [], waves = [];
+  const lights = [];
+  let visFire = 0, visLava = 0, rainCount = 0, vb = { x0: 0, y0: 0, x1: 0, y1: 0 };
+
+  // ================= helpers =================
+  function hash(x, y, s) { const v = Math.sin(x * 127.1 + y * 311.7 + s * 74.7) * 43758.5453123; return v - Math.floor(v); }
+  function lerp(a, b, t) { return a + (b - a) * t; }
+  function clamp(v, a, b) { return v < a ? a : v > b ? b : v; }
+  const rnd = Math.random;
+  function vn(x, y, s) {
+    const x0 = Math.floor(x), y0 = Math.floor(y), fx = x - x0, fy = y - y0;
+    const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+    return lerp(lerp(hash(x0, y0, s), hash(x0 + 1, y0, s), sx), lerp(hash(x0, y0 + 1, s), hash(x0 + 1, y0 + 1, s), sx), sy);
+  }
+  function fbm(x, y, s, o) {
+    let t = 0, f = 1, a = 1, m = 0;
+    for (let i = 0; i < o; i++) { t += vn(x * f, y * f, s + i * 17.3) * a; m += a; f *= 2.03; a *= 0.5; }
+    return t / m;
+  }
+
+  // ================= world =================
+  function setupWorld() {
+    const cw = wrap.clientWidth, ch = wrap.clientHeight;
+    W = clamp(Math.round(cw / 4.2), 80, 200);
+    H = clamp(Math.round(W * ch / cw), 60, 300);
+    N = W * H;
+    hgt = new Float32Array(N); cover = new Uint8Array(N); timer = new Int16Array(N);
+    wet = new Uint8Array(N); vari = new Float32Array(N); lit = new Uint8Array(N);
+    temp = new Float32Array(N); moist = new Float32Array(N); biome = new Uint8Array(N); snow = new Uint16Array(N); grazed = new Uint16Array(N);
+    BW = W * SUB; BH = H * SUB;
+    buf = document.createElement('canvas'); buf.width = BW; buf.height = BH;
+    bctx = buf.getContext('2d');
+    img = bctx.createImageData(BW, BH); data = img.data;
+    noise = new Uint8Array(BW * BH);
+    for (let i = 0; i < noise.length; i++) noise[i] = (rnd() * 256) | 0;
+  }
+
+  const isVeg = h => h >= SAND && h < HILL;
+  function effTemp(i) { return temp[i] - Math.max(0, hgt[i] - 0.55) * 1.3; }
+  function calcBiome(i) {
+    const h = hgt[i], t = effTemp(i), m = moist[i];
+    if (t < 0.28) return B_TUNDRA;
+    if (t > 0.62) { if (m < 0.4) return B_DESERT; if (m < 0.55) return B_SAVANNA; return B_JUNGLE; }
+    if (m > 0.66 && h < 0.52) return B_SWAMP;
+    return B_TEMP;
+  }
+  function isCold(i) { return biome[i] === B_TUNDRA || effTemp(i) < 0.33; }
+  function setH(i, v) { hgt[i] = clamp(v, 0, 1); biome[i] = calcBiome(i); }
+
+  function generate() {
+    seed = rnd() * 1000;
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const i = y * W + x;
+      const dx = (x / (W - 1) - 0.5) * 2, dy = (y / (H - 1) - 0.5) * 2;
+      let e = fbm(x / 24, y / 24, seed, 6);
+      e = 0.5 + (e - 0.5) * 1.8;
+      e += (fbm(x / 6.5, y / 6.5, seed + 13, 3) - 0.5) * 0.1;
+      e = e + 0.14 - Math.pow(Math.max(Math.abs(dx), Math.abs(dy)), 4) * 0.45 - (dx * dx + dy * dy) * 0.1;
+      hgt[i] = clamp(e, 0, 1);
+      let t = fbm(x / 36, y / 36, seed + 200, 4);
+      t = (0.5 + (t - 0.5) * 1.8) * 0.65 + (y / (H - 1)) * 0.5 - 0.08;
+      temp[i] = clamp(t, 0, 1);
+      moist[i] = clamp(0.5 + (fbm(x / 22, y / 22, seed + 400, 4) - 0.5) * 1.9, 0, 1);
+      cover[i] = C_NONE; timer[i] = 0; wet[i] = 0; snow[i] = 0; grazed[i] = 0; vari[i] = rnd();
+    }
+    for (let i = 0; i < N; i++) biome[i] = calcBiome(i);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const i = y * W + x, h = hgt[i], b = biome[i];
+      if (h >= SEA && b === B_TUNDRA) snow[i] = 250 + ((rnd() * 300) | 0);
+      if (!isVeg(h) || h < SAND + 0.01) continue;
+      const f = fbm(x / 10, y / 10, seed + 77, 4);
+      let tree = false;
+      switch (b) {
+        case B_TEMP: tree = (f > 0.53 && rnd() < 0.85) || rnd() < 0.03; break;
+        case B_JUNGLE: tree = (f > 0.42 && rnd() < 0.9) || rnd() < 0.08; break;
+        case B_SWAMP: tree = f > 0.5 && rnd() < 0.55; break;
+        case B_TUNDRA: tree = f > 0.55 && rnd() < 0.7; break;
+        case B_SAVANNA: tree = rnd() < 0.06; break;
+        case B_DESERT: tree = rnd() < 0.025; break;
+      }
+      if (tree) cover[i] = C_TREE;
+    }
+    particles.length = 0; clouds.length = 0; tornados.length = 0; meteors.length = 0; bolts.length = 0; waves.length = 0;
+    for (let k = 0; k < 4; k++) spawnAmbientCloud(true);
+    populate();
+    dirty = true;
+  }
+
+  // ================= colours =================
+  const P = {
+    deep0: [18, 44, 102], deep1: [28, 72, 150], sh0: [36, 96, 182], sh1: [72, 152, 226],
+    sand0: [234, 216, 154], sand1: [214, 190, 122], tsand0: [196, 198, 188], tsand1: [176, 178, 170],
+    rk0: [132, 128, 122], rk1: [88, 86, 92], sn0: [224, 232, 240], sn1: [255, 255, 255]
+  };
+  const BIO = [
+    { g0: [122, 198, 78], g1: [72, 152, 56], h0: [66, 132, 52], h1: [112, 108, 76] },
+    { g0: [204, 220, 210], g1: [162, 184, 172], h0: [150, 170, 160], h1: [140, 142, 146] },
+    { g0: [240, 208, 134], g1: [220, 178, 104], h0: [208, 152, 98], h1: [162, 110, 74] },
+    { g0: [204, 196, 96], g1: [168, 162, 74], h0: [152, 146, 72], h1: [126, 112, 76] },
+    { g0: [74, 182, 64], g1: [40, 132, 46], h0: [36, 114, 44], h1: [82, 98, 62] },
+    { g0: [106, 128, 72], g1: [76, 100, 58], h0: [72, 98, 58], h1: [98, 102, 74] }
+  ];
+  const col = [0, 0, 0];
+  function mix(a, b, t) { t = clamp(t, 0, 1); col[0] = lerp(a[0], b[0], t); col[1] = lerp(a[1], b[1], t); col[2] = lerp(a[2], b[2], t); }
+  function terrain(h, b) {
+    if (h < DEEP) mix(P.deep0, P.deep1, h / DEEP);
+    else if (h < SEA) mix(P.sh0, P.sh1, (h - DEEP) / (SEA - DEEP));
+    else if (h < SAND) { const t = (h - SEA) / (SAND - SEA); b === B_TUNDRA ? mix(P.tsand0, P.tsand1, t) : mix(P.sand0, P.sand1, t); }
+    else if (h < GRASS) mix(BIO[b].g0, BIO[b].g1, (h - SAND) / (GRASS - SAND));
+    else if (h < HILL) mix(BIO[b].h0, BIO[b].h1, (h - GRASS) / (HILL - GRASS));
+    else if (h < ROCK) mix(P.rk0, P.rk1, (h - HILL) / (ROCK - HILL));
+    else mix(P.sn0, P.sn1, (h - ROCK) / 0.1);
+  }
+  function hAt(x, y) { x = x < 0 ? 0 : x >= W ? W - 1 : x; y = y < 0 ? 0 : y >= H ? H - 1 : y; return hgt[y * W + x]; }
+
+  // ================= sprites (original art) =================
+  const SPR = {
+    leafy: ['..ll..', '.llmm.', 'llmmmd', 'lmmmdd', '.mmddd', '..dd..', '..tt..', '..tt..'],
+    round: ['......', '.lll..', 'llmmm.', 'lmmmmd', '.mmmd.', '..td..', '..t...', '......'],
+    pine: ['..l...', '..lm..', '.lmm..', '.lmmd.', 'lmmmd.', 'lmmmdd', '..t...', '..t...'],
+    cactus: ['..gl..', '..gl..', 'g.gl..', 'gggl.g', '..glgg', '..gl..', '..gl..', '..gl..'],
+    acacia: ['......', '......', 'lllmmm', 'mmmmdd', '.t..t.', '..tt..', '..t...', '..t...'],
+    palm: ['.l..l.', 'llmmll', 'm.mm.d', 'm..t.d', '...t..', '..t...', '..t...', '..t...'],
+    willow: ['..dd..', '.dmmd.', 'dmmmmd', 'dmddmd', 'd.dd.d', 'd.t..d', '..t...', '..t...']
+  };
+  const PAL = {
+    leafy: { l: [104, 184, 72], m: [52, 128, 52], d: [30, 88, 40], t: [96, 64, 38] },
+    pine: { l: [72, 142, 82], m: [36, 100, 58], d: [22, 66, 42], t: [88, 58, 34] },
+    tpine: { l: [236, 244, 248], m: [40, 92, 66], d: [26, 62, 46], t: [80, 56, 36] },
+    cactus: { g: [64, 148, 72], l: [112, 192, 102] },
+    acacia: { l: [150, 170, 70], m: [110, 136, 52], d: [80, 100, 40], t: [100, 72, 44] },
+    palm: { l: [124, 212, 84], m: [46, 152, 52], d: [24, 98, 38], t: [110, 78, 44] },
+    jungle: { l: [96, 200, 70], m: [34, 128, 44], d: [18, 84, 32], t: [96, 64, 38] },
+    willow: { l: [100, 130, 70], m: [74, 104, 56], d: [46, 72, 42], t: [72, 58, 40] }
+  };
+  for (const k in PAL) PAL[k].snowy = Object.assign({}, PAL[k], { l: [240, 246, 250] });
+  const FIRE_SPR = [
+    ['...y..', '..yy..', '..yoy.', '.yooy.', '.oyyo.', 'oryyro', 'orrrro', '.rrrr.'],
+    ['..y...', '..yy.y', '.yoyy.', '.yooo.', 'oyyyo.', 'oryyro', 'orrrro', '.rrrr.'],
+    ['....y.', '.y.yy.', '.yoy..', 'yooy..', 'oyyoo.', 'oryyro', 'orrrro', '.rrrr.']
+  ];
+  const FIRE_PAL = { y: [255, 238, 120], o: [255, 150, 40], r: [212, 58, 24] };
+
+  function setPx(x, y, c) {
+    if (x < 0 || y < 0 || x >= BW || y >= BH) return;
+    const q = (y * BW + x) * 4; data[q] = c[0]; data[q + 1] = c[1]; data[q + 2] = c[2];
+  }
+  function darkenPx(x, y, f) {
+    if (x < 0 || y < 0 || x >= BW || y >= BH) return;
+    const q = (y * BW + x) * 4; data[q] *= f; data[q + 1] *= f; data[q + 2] *= f;
+  }
+  function tintPx(x, y, c, t) {
+    if (x < 0 || y < 0 || x >= BW || y >= BH) return;
+    const q = (y * BW + x) * 4;
+    data[q] = lerp(data[q], c[0], t); data[q + 1] = lerp(data[q + 1], c[1], t); data[q + 2] = lerp(data[q + 2], c[2], t);
+  }
+  function drawSprite(bx, by, spr, pal, flip) {
+    for (let ry = 0; ry < spr.length; ry++) {
+      const row = spr[ry], w = row.length;
+      for (let rx = 0; rx < w; rx++) {
+        const ch = row[flip ? w - 1 - rx : rx];
+        if (ch !== '.') setPx(bx + rx, by + ry, pal[ch]);
+      }
+    }
+  }
+  function drawTree(x, y, i) {
+    const b = biome[i], v = vari[i], h = hgt[i];
+    let spr, pal;
+    if (b === B_DESERT) { spr = SPR.cactus; pal = PAL.cactus; }
+    else if (b === B_TUNDRA) { spr = SPR.pine; pal = PAL.tpine; }
+    else if (b === B_SAVANNA) { spr = SPR.acacia; pal = PAL.acacia; }
+    else if (b === B_JUNGLE) { spr = v < 0.5 ? SPR.palm : SPR.leafy; pal = v < 0.5 ? PAL.palm : PAL.jungle; }
+    else if (b === B_SWAMP) { spr = SPR.willow; pal = PAL.willow; }
+    else {
+      const pine = h > GRASS - 0.03 ? v < 0.8 : v < 0.22;
+      spr = pine ? SPR.pine : (v > 0.6 ? SPR.round : SPR.leafy);
+      pal = pine ? PAL.pine : PAL.leafy;
+    }
+    if (snow[i] > 60) pal = pal.snowy;
+    const bx = x * SUB, by = y * SUB - 2;
+    for (let sy = 5; sy < 8; sy++) for (let sx = 1; sx < 5; sx++) darkenPx(bx + sx + 1, by + sy + 1, 0.72);
+    drawSprite(bx, by, spr, pal, v > 0.5);
+  }
+  const GLOW = [255, 120, 40];
+  function drawFire(x, y, i) {
+    const bx = x * SUB, by = y * SUB - 2;
+    for (let sy = -2; sy < 9; sy++) for (let sx = -3; sx < 9; sx++) tintPx(bx + sx, by + sy, GLOW, 0.18);
+    const f = (frame + ((vari[i] * 3) | 0)) % 3;
+    drawSprite(bx, by, FIRE_SPR[f], FIRE_PAL, vari[i] > 0.5);
+  }
+  function drawDeco(x, y, i) {
+    const v = vari[i], b = biome[i], bx = x * SUB, by = y * SUB;
+    const sx = bx + (((v * 37) | 0) % (SUB - 2)), sy = by + (((v * 91) | 0) % (SUB - 2));
+    if (b === B_TEMP && v > 0.95) setPx(sx, sy, v > 0.983 ? [240, 80, 80] : v > 0.967 ? [250, 230, 90] : [245, 245, 245]);
+    else if (b === B_DESERT && v > 0.93) { setPx(sx, sy, [150, 130, 110]); setPx(sx + 1, sy, [120, 104, 90]); }
+    else if (b === B_SWAMP && v > 0.68) { setPx(sx, sy, [58, 92, 92]); setPx(sx + 1, sy, [58, 92, 92]); setPx(sx, sy + 1, [50, 82, 84]); setPx(sx + 1, sy + 1, [96, 136, 134]); }
+    else if (b === B_SAVANNA && v > 0.95) { setPx(sx, sy, [150, 120, 60]); setPx(sx + 1, sy, [130, 100, 50]); }
+    else if (b === B_JUNGLE && v > 0.965) setPx(sx, sy, [255, 120, 200]);
+  }
+
+  // ================= render to pixel buffer =================
+  const FOAM = [196, 230, 250], BURNT = [56, 46, 40], ICE = [206, 235, 248];
+  function renderBuffer() {
+    lights.length = 0; visFire = 0; visLava = 0;
+    vb.x0 = -camX / zoom / SUB; vb.y0 = -camY / zoom / SUB; vb.x1 = (canvas.width - camX) / zoom / SUB; vb.y1 = (canvas.height - camY) / zoom / SUB;
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const i = y * W + x, h = hgt[i], c = cover[i], water = h < SEA, b = biome[i];
+        terrain(h, b);
+        let r = col[0], g = col[1], bl = col[2];
+        let lava = false, basalt = false, snowA = 0, sr = 0, sg = 0, sb = 0;
+        if (water) {
+          if (h >= DEEP - 0.03) {
+            const tw = clamp((temp[i] - 0.58) * 3, 0, 1) * 0.32;
+            r = lerp(r, 56, tw); g = lerp(g, 196, tw); bl = lerp(bl, 206, tw);
+          }
+          if (c === C_ICE) { r = ICE[0]; g = ICE[1]; bl = ICE[2]; }
+          else if (hAt(x - 1, y) >= SEA || hAt(x + 1, y) >= SEA || hAt(x, y - 1) >= SEA || hAt(x, y + 1) >= SEA) {
+            const t = 0.42 + (((frame >> 1) + ((vari[i] * 4) | 0)) % 4 === 0 ? 0.22 : 0);
+            r = lerp(r, FOAM[0], t); g = lerp(g, FOAM[1], t); bl = lerp(bl, FOAM[2], t);
+          }
+        } else {
+          let f = 1 + clamp((hAt(x + 1, y + 1) - hAt(x - 1, y - 1)) * 5, -0.32, 0.32);
+          if (c === C_BURNT) { r = lerp(r, BURNT[0], 0.78); g = lerp(g, BURNT[1], 0.78); bl = lerp(bl, BURNT[2], 0.78); }
+          else if (c === C_FIRE) { r = 92; g = 40; bl = 22; f = 1; }
+          else if (c === C_LAVA) { lava = true; }
+          else if (c === C_BASALT) { r = 64; g = 58; bl = 60; basalt = true; }
+          if (wet[i] > 0) f *= 0.85;
+          if (grazed[i] > 0 && c === C_NONE) { const gt = Math.min(0.5, grazed[i] / 260); r = lerp(r, 150, gt); g = lerp(g, 126, gt); bl = lerp(bl, 84, gt); }
+          r *= f; g *= f; bl *= f;
+          if (snow[i] > 0 && c !== C_FIRE && c !== C_LAVA) {
+            snowA = Math.min(1, snow[i] / 260) * 290;
+            sr = 236 * f; sg = 243 * f; sb = 250 * f;
+          }
+        }
+        const amp = water ? 0.00022 : 0.0007;
+        const bx = x * SUB, by = y * SUB;
+        for (let sy = 0; sy < SUB; sy++) {
+          let p = (by + sy) * BW + bx;
+          for (let sx = 0; sx < SUB; sx++, p++) {
+            const n = noise[p], q = p * 4;
+            let RR, GG, BB;
+            if (lava) {
+              if (n < 34) { RR = 72; GG = 22; BB = 12; }
+              else {
+                const v = ((n + frame * 9 + sx * 31 + sy * 17) & 255) / 255, v2 = v * v;
+                RR = lerp(215, 255, v); GG = lerp(56, 212, v2); BB = lerp(18, 72, v2);
+              }
+            } else {
+              const k = 1 + (n - 128) * amp;
+              RR = r * k; GG = g * k; BB = bl * k;
+              if (water && c !== C_ICE && ((n + frame * 5 + (by + sy) * 3) & 255) < 2) { RR += 45; GG += 45; BB += 40; }
+              else if (basalt && n > 247 && timer[i] > 500) { RR = 232; GG = 84; BB = 30; }
+              else if (snowA > 0 && n < snowA) { const k2 = 1 + (n - 128) * 0.0002; RR = sr * k2; GG = sg * k2; BB = sb * k2; }
+            }
+            data[q] = RR; data[q + 1] = GG; data[q + 2] = BB; data[q + 3] = 255;
+          }
+        }
+        if (lava && vari[i] < 0.4) lights.push(x * SUB + SUB / 2, y * SUB + SUB / 2, 0.8);
+        if (lava && x >= vb.x0 && x <= vb.x1 && y >= vb.y0 && y <= vb.y1) visLava++;
+      }
+    }
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const i = y * W + x, c = cover[i];
+      if (c === C_TREE) drawTree(x, y, i);
+      else if (c === C_FIRE) { drawFire(x, y, i); lights.push(x * SUB + SUB / 2, y * SUB, 1.2); if (x >= vb.x0 && x <= vb.x1 && y >= vb.y0 && y <= vb.y1) visFire++; }
+      else if (c === C_NONE && isVeg(hgt[i]) && snow[i] < 40) drawDeco(x, y, i);
+    }
+    bctx.putImageData(img, 0, 0);
+  }
+
+  // ================= particles =================
+  function addP(kind, x, y, vx, vy, life, extra) {
+    const p = { kind, x, y, vx, vy, life, max: life };
+    if (extra) Object.assign(p, extra);
+    particles.push(p);
+  }
+  const rainAt = (bx, by) => addP('rain', bx - wx * 4 * K, by - 14 * K, wx * 0.6 * K, 2.4 * K, 6);
+  const snowAt = (bx, by) => addP('snow', bx, by - 8 * K, wx * 0.3 * K, 0.35 * K, 22 + rnd() * 14);
+  const smokeAt = (bx, by) => addP('smoke', bx + (rnd() - 0.5) * 2, by, 0.08 + wx * 0.15, -0.28 + wy * 0.05, 45 + rnd() * 25);
+  const steamAt = (bx, by) => { addP('steam', bx + (rnd() - 0.5) * 3, by, wx * 0.12, -0.35, 30 + rnd() * 20); if (cool('hiss', 450)) SFX.hiss(); };
+  const emberAt = (bx, by) => addP('ember', bx + (rnd() - 0.5) * 3, by, (rnd() - 0.5) * 0.4 + wx * 0.2, -0.4 - rnd() * 0.3, 15 + rnd() * 15);
+  function burst(kind, bx, by, n, sp, colors, life) {
+    for (let k = 0; k < n; k++) {
+      const a = rnd() * Math.PI * 2, s = sp * (0.3 + rnd());
+      addP(kind, bx, by, Math.cos(a) * s, Math.sin(a) * s, life * (0.6 + rnd() * 0.6), { c: colors[(rnd() * colors.length) | 0], drag: 0.93 });
+    }
+  }
+  function updateParticles() {
+    rainCount = 0;
+    for (let k = particles.length - 1; k >= 0; k--) {
+      const p = particles[k];
+      if (p.kind === 'rain') rainCount++;
+      p.x += p.vx; p.y += p.vy;
+      if (p.drag) { p.vx *= p.drag; p.vy *= p.drag; }
+      if (p.kind === 'snow') p.vx += (rnd() - 0.5) * 0.08;
+      else if (p.kind === 'leaf') p.vy -= 0.012;
+      if (--p.life <= 0) {
+        if (p.kind === 'rain' && rnd() < 0.5) addP('splash', p.x, p.y, 0, 0, 6);
+        particles.splice(k, 1);
+      }
+    }
+    if (particles.length > 1600) particles.splice(0, particles.length - 1600);
+  }
+
+  // ================= AUDIO (synthesized in browser) =================
+  let AC = null, master = null, echoIn = null, noiseBuf = null, soundOn = true;
+  const loops = {}, sfxCd = {};
+  function initAudio() {
+    if (AC) { if (AC.state === 'suspended') AC.resume(); return; }
+    const Ctor = window.AudioContext || window.webkitAudioContext;
+    if (!Ctor) return;
+    AC = new Ctor();
+    master = AC.createGain(); master.gain.value = soundOn ? 0.7 : 0; master.connect(AC.destination);
+    echoIn = AC.createDelay(1); echoIn.delayTime.value = 0.3;
+    const fb = AC.createGain(); fb.gain.value = 0.35;
+    const wetG = AC.createGain(); wetG.gain.value = 0.45;
+    echoIn.connect(fb); fb.connect(echoIn); echoIn.connect(wetG); wetG.connect(master);
+    noiseBuf = AC.createBuffer(1, AC.sampleRate * 2, AC.sampleRate);
+    const d = noiseBuf.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    loops.ocean = mkLoop('lowpass', 420, 0.7);
+    loops.wind = mkLoop('bandpass', 600, 0.9);
+    loops.rain = mkLoop('highpass', 1800, 0.5);
+    loops.fire = mkLoop('lowpass', 380, 0.8);
+    loops.tornado = mkLoop('lowpass', 240, 1.4);
+    loops.lava = mkLoop('lowpass', 130, 1);
+  }
+  function mkLoop(type, freq, q) {
+    const src = AC.createBufferSource(); src.buffer = noiseBuf; src.loop = true;
+    src.playbackRate.value = 0.8 + Math.random() * 0.4;
+    const f = AC.createBiquadFilter(); f.type = type; f.frequency.value = freq; f.Q.value = q;
+    const g = AC.createGain(); g.gain.value = 0;
+    src.connect(f); f.connect(g); g.connect(master); src.start();
+    return { f, g };
+  }
+  function setLoop(l, v, freq) {
+    if (!l) return;
+    const t = AC.currentTime;
+    l.g.gain.setTargetAtTime(v, t, 0.3);
+    if (freq) l.f.frequency.setTargetAtTime(freq, t, 0.3);
+  }
+  const canPlay = () => AC && soundOn && AC.state === 'running';
+  function cool(key, ms) { const now = performance.now(); if ((sfxCd[key] || 0) > now) return false; sfxCd[key] = now + ms; return true; }
+  function envelope(g, t, a, vol, dur) {
+    vol = Math.max(0.0002, vol);
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + a);
+    g.gain.setValueAtTime(vol, t + Math.max(a, dur * 0.55));
+    g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  }
+  function noiseShot(o) {
+    if (!canPlay()) return;
+    const t = AC.currentTime + (o.delay || 0), dur = o.dur || 0.4, a = o.attack || 0.01;
+    const s = AC.createBufferSource(); s.buffer = noiseBuf;
+    const f = AC.createBiquadFilter(); f.type = o.type || 'lowpass'; f.Q.value = o.q || 1;
+    f.frequency.setValueAtTime(o.freq || 1000, t);
+    if (o.freqEnd) f.frequency.exponentialRampToValueAtTime(o.freqEnd, t + dur);
+    const g = AC.createGain(); envelope(g, t, a, o.vol || 0.2, dur);
+    s.connect(f); f.connect(g); g.connect(master);
+    s.start(t, Math.random() * 1.2); s.stop(t + dur + 0.05);
+  }
+  function tone(o) {
+    if (!canPlay()) return;
+    const t = AC.currentTime + (o.delay || 0), dur = o.dur, a = o.attack || 0.02;
+    const osc = AC.createOscillator(); osc.type = o.type || 'sine';
+    o.freqs.forEach(([tt, fr], k) => { if (k) osc.frequency.linearRampToValueAtTime(fr, t + tt); else osc.frequency.setValueAtTime(fr, t); });
+    let node = osc; const extra = [];
+    if (o.vib) { const l = AC.createOscillator(); l.frequency.value = o.vib; const lg = AC.createGain(); lg.gain.value = o.vibDepth || 10; l.connect(lg); lg.connect(osc.frequency); extra.push(l); }
+    if (o.filter) { const f = AC.createBiquadFilter(); f.type = o.filter[0]; f.frequency.value = o.filter[1]; f.Q.value = o.filter[2]; node.connect(f); node = f; }
+    const g = AC.createGain(); envelope(g, t, a, o.vol, dur); node.connect(g);
+    let out = g;
+    if (o.am) { const am = AC.createGain(); am.gain.value = 0.5; const l = AC.createOscillator(); l.frequency.value = o.am; const lg = AC.createGain(); lg.gain.value = 0.5; l.connect(lg); lg.connect(am.gain); extra.push(l); g.connect(am); out = am; }
+    out.connect(master); if (o.echo) out.connect(echoIn);
+    osc.start(t); osc.stop(t + dur + 0.1);
+    extra.forEach(l => { l.start(t); l.stop(t + dur + 0.1); });
+  }
+  const SFX = {
+    click() { tone({ type: 'square', freqs: [[0, 880], [0.04, 620]], dur: 0.05, vol: 0.04, attack: 0.003 }); },
+    pop() { tone({ type: 'triangle', freqs: [[0, 420], [0.1, 880]], dur: 0.13, vol: 0.08, attack: 0.005 }); },
+    poof() { noiseShot({ type: 'bandpass', freq: 700, dur: 0.18, vol: 0.1, attack: 0.005 }); },
+    thunder(far) {
+      const d = far || 0;
+      noiseShot({ type: 'highpass', freq: 2200, dur: 0.15, vol: 0.4 * (1 - d * 0.7), delay: d * 0.8, attack: 0.003 });
+      noiseShot({ type: 'lowpass', freq: 600, freqEnd: 70, dur: 2.4, vol: 0.55 * (1 - d * 0.4), delay: 0.05 + d * 0.8, attack: 0.04 });
+      noiseShot({ type: 'lowpass', freq: 260, freqEnd: 50, dur: 1.8, vol: 0.35, delay: 0.6 + d * 0.8, attack: 0.25 });
+    },
+    boom() {
+      tone({ type: 'sine', freqs: [[0, 95], [1.3, 26]], dur: 1.5, vol: 0.7, attack: 0.008 });
+      noiseShot({ type: 'lowpass', freq: 1000, freqEnd: 55, dur: 2.8, vol: 0.65, attack: 0.008 });
+      noiseShot({ type: 'highpass', freq: 1400, dur: 0.3, vol: 0.3, attack: 0.003 });
+    },
+    whoosh() { noiseShot({ type: 'bandpass', freq: 2600, freqEnd: 280, q: 2.2, dur: 1.05, vol: 0.28, attack: 0.35 }); },
+    splash(v) { noiseShot({ type: 'bandpass', freq: 1500, freqEnd: 450, q: 0.9, dur: 0.35, vol: v || 0.15, attack: 0.005 }); },
+    hiss() { noiseShot({ type: 'highpass', freq: 3200, dur: 0.6, vol: 0.06, attack: 0.05 }); },
+    crackle(v) { noiseShot({ type: 'highpass', freq: 1800 + rnd() * 2400, dur: 0.03 + rnd() * 0.04, vol: v, attack: 0.002 }); },
+    blup() { tone({ type: 'sine', freqs: [[0, 60 + rnd() * 30], [0.16, 150 + rnd() * 60]], dur: 0.2, vol: 0.16, attack: 0.01 }); },
+    rumble() { noiseShot({ type: 'lowpass', freq: 170, dur: 0.4, vol: 0.14, attack: 0.05 }); },
+    cricket() { const f = 4200 + rnd() * 600; for (let k = 0; k < 4; k++) tone({ type: 'sine', freqs: [[0, f], [0.03, f]], dur: 0.035, vol: 0.018, delay: k * 0.06, attack: 0.003 }); },
+    baa(v) { tone({ type: 'sawtooth', freqs: [[0, 340], [0.12, 310], [0.6, 280]], dur: 0.65, vol: 0.1 * v, vib: 7, vibDepth: 20, filter: ['bandpass', 1100, 1.4], attack: 0.04 }); },
+    moo(v) { tone({ type: 'sawtooth', freqs: [[0, 115], [0.35, 135], [1.1, 98]], dur: 1.15, vol: 0.16 * v, filter: ['lowpass', 650, 1.2], attack: 0.12 }); },
+    cluck(v) { for (let k = 0; k < 3; k++) tone({ type: 'square', freqs: [[0, 700 + rnd() * 250], [0.06, 430]], dur: 0.07, vol: 0.045 * v, delay: k * 0.13, filter: ['bandpass', 1200, 2], attack: 0.004 }); },
+    howl(v) { tone({ type: 'sine', freqs: [[0, 380], [0.5, 640], [1.6, 580], [2.3, 420]], dur: 2.4, vol: 0.12 * v, vib: 5, vibDepth: 9, attack: 0.3, echo: true }); },
+    tweet(v) { const n = 2 + ((rnd() * 3) | 0); for (let k = 0; k < n; k++) tone({ type: 'sine', freqs: [[0, 2600 + rnd() * 900], [0.07, 3800 + rnd() * 900]], dur: 0.08, vol: 0.045 * v, delay: k * 0.11, attack: 0.004 }); },
+    gull(v) { for (let k = 0; k < 2; k++) tone({ type: 'sawtooth', freqs: [[0, 1450], [0.25, 900]], dur: 0.3, vol: 0.05 * v, delay: k * 0.36, filter: ['bandpass', 1600, 3], attack: 0.02 }); },
+    screech(v) { tone({ type: 'sawtooth', freqs: [[0, 2300], [0.7, 1500]], dur: 0.75, vol: 0.06 * v, vib: 28, vibDepth: 70, filter: ['bandpass', 2200, 4], attack: 0.04, echo: true }); },
+    croak(v) { tone({ type: 'square', freqs: [[0, 96], [0.35, 80]], dur: 0.38, vol: 0.09 * v, filter: ['lowpass', 520, 3], am: 24, attack: 0.02 }); },
+    whale(v) { tone({ type: 'sine', freqs: [[0, 260], [1.2, 190], [2.4, 390], [3.2, 300]], dur: 3.3, vol: 0.17 * v, vib: 3, vibDepth: 7, attack: 0.6, echo: true }); },
+    dolphin(v) { tone({ type: 'sine', freqs: [[0, 1500], [0.15, 3300], [0.3, 2200]], dur: 0.32, vol: 0.045 * v, attack: 0.01 }); },
+    squawk(v) { for (let k = 0; k < 2; k++) tone({ type: 'sawtooth', freqs: [[0, 650], [0.12, 480]], dur: 0.14, vol: 0.06 * v, delay: k * 0.2, filter: ['bandpass', 900, 3], attack: 0.01 }); },
+    growl(v) { tone({ type: 'sawtooth', freqs: [[0, 72], [0.8, 58]], dur: 0.9, vol: 0.15 * v, filter: ['lowpass', 320, 2], am: 28, attack: 0.08 }); },
+    grunt(v) { tone({ type: 'sawtooth', freqs: [[0, 92], [0.3, 70]], dur: 0.35, vol: 0.12 * v, filter: ['lowpass', 420, 1.5], attack: 0.03 }); },
+    trumpet(v) { tone({ type: 'sawtooth', freqs: [[0, 420], [0.15, 700], [0.8, 560]], dur: 0.9, vol: 0.09 * v, vib: 9, vibDepth: 25, filter: ['bandpass', 900, 2], attack: 0.05 }); },
+    roar(v) { noiseShot({ type: 'lowpass', freq: 420, freqEnd: 140, dur: 1.2, vol: 0.22 * v, attack: 0.1 }); tone({ type: 'sawtooth', freqs: [[0, 115], [1.1, 70]], dur: 1.2, vol: 0.12 * v, filter: ['lowpass', 520, 1.5], am: 18, attack: 0.1 }); },
+    yip(v) { for (let k = 0; k < 2; k++) tone({ type: 'square', freqs: [[0, 900], [0.08, 1300], [0.14, 800]], dur: 0.16, vol: 0.045 * v, delay: k * 0.25, filter: ['bandpass', 1100, 3], attack: 0.01 }); },
+    squeak(v) { for (let k = 0; k < 3; k++) tone({ type: 'sine', freqs: [[0, 5200], [0.03, 4500]], dur: 0.04, vol: 0.022 * v, delay: k * 0.07, attack: 0.003 }); }
+  };
+
+  // ================= ANIMALS (original sprites, smart AI) =================
+  const F_GRASS = 1, F_BROWSE = 2, F_FISH = 3, F_BUGS = 4, F_DESERT = 5;
+  const BEAR_A = ['..........bb.', '....bbbbb.bbb', '..bbbbbbbbbkb', '.bbbbbbbbbbsk', 'bbbbbbbbbbbb.', 'bbbbbbbbbbb..', '.bbbbbbbbbb..', '.bb.bb.bb.bb.', '.kk.kk.kk.kk.'];
+  const BEAR_B = BEAR_A.slice(0, 7).concat(['.bb..bbbb.bb.', '.kk..kkkk.kk.']);
+  const LAND = (o) => Object.assign({ kind: 'land', hr: 0.00022, stam: 170, adult: 2400, vision: 6, thirsty: true, diurnal: true, group: 1, init: 1, cap: 30 }, o);
+  const SPECIES = {
+    // ---- herbivores ----
+    cow: LAND({ name: 'Корова', legs: 2, frames: [
+      ['...........c.c', '..........kwwk', '.wwwkkwwwwwwkw', 'twkkkwwwkkwwww', 'twwkkwwwkkwppp', 'twwwwwwkwwkpp.', '.wkwwwwwww....', '..k.kpp.k.k...', '..g.g...g.g...'],
+      ['...........c.c', '..........kwwk', '.wwwkkwwwwwwkw', 'twkkkwwwkkwwww', 'twwkkwwwkkwppp', 'twwwwwwkwwkpp.', '.wkwwwwwww....', '...kk.pp..kk..', '..g..g...g..g.']],
+      pals: [{ w: '#f4f2ec', k: '#2e2a28', p: '#eaa4a0', c: '#e8dcc0', t: '#2e2a28', g: '#4a4040' }],
+      speed: 0.011, run: 0.03, food: F_GRASS, biomes: [B_TEMP, B_SAVANNA], voice: 'moo', init: 2, group: 3, cap: 36, herd: true }),
+    sheep: LAND({ name: 'Вівця', legs: 2, frames: [
+      ['..w.w.w...', '.wwwwwwkk.', 'wwwwwwwkek', 'wwwwwwwwkk', 'wwwwwwww..', '.sssssss..', '.k.k..k.k.', '.k.k..k.k.'],
+      ['..w.w.w...', '.wwwwwwkk.', 'wwwwwwwkek', 'wwwwwwwwkk', 'wwwwwwww..', '.sssssss..', '..kk..kk..', '.k..k.k..k']],
+      pals: [{ w: '#f2f0e4', s: '#d2cdbd', k: '#34302e', e: '#ffffff' }],
+      speed: 0.012, run: 0.032, food: F_GRASS, biomes: [B_TEMP, B_SAVANNA, B_TUNDRA], voice: 'baa', init: 2, group: 4, cap: 34, herd: true }),
+    chicken: LAND({ name: 'Курка', legs: 1, frames: [
+      ['....rr.', '...www.', '...wwky', 't..wwr.', 'ttwwww.', '.wvvvw.', '..www..', '..y.y..'],
+      ['....rr.', '...www.', '...wwky', 't..wwr.', 'ttwwww.', '.wvvvw.', '..www..', '...y.y.']],
+      pals: [{ w: '#fbfaf4', r: '#e0342a', y: '#f2a61e', k: '#1a1a1a', t: '#e6dfcf', v: '#d2cabb' }],
+      speed: 0.013, run: 0.03, food: F_GRASS, biomes: [B_TEMP], voice: 'cluck', init: 2, group: 3, cap: 28, herd: true, adult: 1800, litter: 2 }),
+    rabbit: LAND({ name: 'Заєць', legs: 1, hop: true, frames: [
+      ['....b.b', '....b.b', '....bkb', 'wbbbbbp', 'wbbbbb.', '.bbbb..', '..b.bb.'],
+      ['....b.b', '....b.b', '....bkb', 'wbbbbbp', 'wbbbbb.', '.bbbb..', 'bb...b.']],
+      pals: [{ b: '#b9a68c', k: '#1a1a1a', w: '#ffffff', p: '#e8a0a0' }],
+      speed: 0.016, run: 0.05, vision: 7, food: F_GRASS, biomes: [B_TEMP, B_SAVANNA, B_TUNDRA], init: 3, group: 2, cap: 40, adult: 1600, litter: 2 }),
+    deer: LAND({ name: 'Олень', legs: 2, frames: [
+      ['.......a.a.', '........aa.', '........bbb', '.......bbkb', '.......bbbd', 'wbbbbbbbbb.', '.bbbbbbbbb.', '..lllllll..', '..b.b..b.b.', '..k.k..k.k.'],
+      ['.......a.a.', '........aa.', '........bbb', '.......bbkb', '.......bbbd', 'wbbbbbbbbb.', '.bbbbbbbbb.', '..lllllll..', '.b...b.b..b', '.k...k.k..k']],
+      pals: [{ a: '#dccaa2', b: '#a8683a', k: '#1e1612', d: '#1e1612', w: '#f4efe6', l: '#d6ae80' }],
+      speed: 0.015, run: 0.055, vision: 8, food: F_BROWSE, biomes: [B_TEMP, B_JUNGLE], init: 2, group: 3, cap: 36, herd: true }),
+    zebra: LAND({ name: 'Зебра', legs: 2, frames: [
+      ['.........kk.', '........kwww', 't......kwwkw', 'twkwkwkwkwwd', '.wkwkwkwkw..', '.kwkwkwkwk..', '.w.w...w.w..', '.k.k...k.k..'],
+      ['.........kk.', '........kwww', 't......kwwkw', 'twkwkwkwkwwd', '.wkwkwkwkw..', '.kwkwkwkwk..', 'w...ww...w..', 'k...kk...k..']],
+      pals: [{ w: '#f6f6f2', k: '#1c1c20', d: '#3a3a3e', t: '#1c1c20' }],
+      speed: 0.014, run: 0.052, vision: 7, food: F_GRASS, biomes: [B_SAVANNA], init: 2, group: 4, cap: 40, herd: true }),
+    elephant: LAND({ name: 'Слон', legs: 3, brave: true, frames: [
+      ['..........ggg...', '..ggggggggeeggg.', '.gggggggggeeegkg', 'tgggggggggeeeggg', 'tgggggggggeeeggw', '.gggggggggeegg.g', '.ggggggggggggg.g', '.gggggggggggg..g', '.gg.gg...gg.gg..', '.gg.gg...gg.gg..', '.ll.ll...ll.ll..'],
+      ['..........ggg...', '..ggggggggeeggg.', '.gggggggggeeegkg', 'tgggggggggeeeggg', 'tgggggggggeeeggw', '.gggggggggeegg.g', '.ggggggggggggg.g', '.gggggggggggg..g', '.gg..gg.gg..gg..', '.gg..gg.gg..gg..', '.ll..ll.ll..ll..']],
+      pals: [{ g: '#8c9096', e: '#6e7278', k: '#1c1c1c', w: '#f4f0e0', t: '#6a6e74', l: '#b8b4ac' }],
+      speed: 0.009, run: 0.024, food: F_BROWSE, biomes: [B_SAVANNA, B_JUNGLE], voice: 'trumpet', init: 1, group: 3, cap: 14, herd: true, adult: 3600, hr: 0.0002 }),
+    camel: LAND({ name: 'Верблюд', legs: 3, frames: [
+      ['...........cc', '..cc..cc...ck', '.ccccccccc.cc', 'tccccccccccc.', '.cccccccccc..', '..cccccccc...', '..c.c..c.c...', '..c.c..c.c...', '..d.d..d.d...'],
+      ['...........cc', '..cc..cc...ck', '.ccccccccc.cc', 'tccccccccccc.', '.cccccccccc..', '..cccccccc...', '.c...cc...c..', '.c...cc...c..', '.d...dd...d..']],
+      pals: [{ c: '#cba06a', k: '#2a1e14', t: '#a07848', d: '#7a5a38' }],
+      speed: 0.011, run: 0.03, food: F_DESERT, biomes: [B_DESERT, B_SAVANNA], voice: 'grunt', init: 2, group: 2, cap: 24, herd: true, hr: 0.0002 }),
+    penguin: LAND({ name: 'Пінгвін', legs: 1, swim: true, thirsty: false, frames: [
+      ['..kk..', '.kkkwk', '.kkkky', '.kwwwk', 'kkwwwk', '.kwwwk', '.kwwk.', '.y..y.'],
+      ['..kk..', '.kkkwk', '.kkkky', '.kwwwk', 'kkwwwk', '.kwwwk', '.kwwk.', '..yy..']],
+      pals: [{ k: '#1c1c28', w: '#f4f4f4', y: '#ff9e24' }],
+      speed: 0.009, run: 0.022, vision: 5, food: F_FISH, biomes: [B_TUNDRA], voice: 'squawk', init: 2, group: 4, cap: 44, herd: true }),
+    frog: LAND({ name: 'Жаба', legs: 1, hop: true, amphib: true, thirsty: false, diurnal: false, frames: [
+      ['....gg', '..ggkg', 'gggggl', 'gllllg', 'gg..gg'],
+      ['....gg', '..ggkg', 'gggggl', 'gllllg', 'g....g']],
+      pals: [{ g: '#4ea83a', k: '#1a1a1a', l: '#a8d880' }],
+      speed: 0.012, run: 0.04, vision: 4, food: F_BUGS, biomes: [B_SWAMP, B_JUNGLE], voice: 'croak', init: 3, group: 2, cap: 44, adult: 1600, litter: 2 }),
+    // ---- predators ----
+    wolf: LAND({ name: 'Вовк', legs: 2, diurnal: false, nocturnal: true, pack: true, frames: [
+      ['.........g.g', '........gggg', 'gg......gkgg', '.gddddddgggk', '..gggggggll.', '..gllllllg..', '..g.g..g.g..', '..k.k..k.k..'],
+      ['.........g.g', '........gggg', 'gg......gkgg', '.gddddddgggk', '..gggggggll.', '..gllllllg..', '.g...gg...g.', '.k...kk...k.']],
+      pals: [{ g: '#8a8c94', d: '#5a5c64', l: '#c8c8cc', k: '#1e1e22' }],
+      speed: 0.014, run: 0.066, stam: 220, vision: 10, pounce: 4, hr: 0.00011, eats: ['sheep', 'chicken', 'rabbit', 'deer', 'cow'], biomes: [B_TEMP, B_TUNDRA], voice: 'howl', init: 1, group: 3, cap: 12 }),
+    fox: LAND({ name: 'Лисиця', legs: 1, diurnal: false, nocturnal: true, frames: [
+      ['........o.o', '........ooo', 'wo......okw', '.oooooooowk', '..owwwwoo..', '..k.k..k.k.'],
+      ['........o.o', '........ooo', 'wo......okw', '.oooooooowk', '..owwwwoo..', '.k..kk..k..']],
+      pals: [{ o: '#e0782a', w: '#f6f0e6', k: '#241c18' }],
+      speed: 0.015, run: 0.064, stam: 200, vision: 8, pounce: 3.5, hr: 0.00011, eats: ['chicken', 'rabbit', 'frog'], biomes: [B_TEMP], voice: 'yip', init: 1, group: 2, cap: 10 }),
+    bear: LAND({ name: 'Ведмідь', legs: 2, swim: true, frames: [BEAR_A, BEAR_B],
+      pals: [{ b: '#6e4a2e', s: '#a07850', k: '#1e1612' }],
+      speed: 0.011, run: 0.058, stam: 200, vision: 7, pounce: 3.5, hr: 0.0001, food: F_FISH, eats: ['deer', 'sheep', 'rabbit'], biomes: [B_TEMP], voice: 'growl', init: 1, group: 2, cap: 6 }),
+    polar: LAND({ name: 'Білий ведмідь', legs: 2, swim: true, frames: [BEAR_A, BEAR_B],
+      pals: [{ b: '#f0ece0', s: '#d8d2c4', k: '#2a2a2a' }],
+      speed: 0.011, run: 0.058, stam: 200, vision: 8, pounce: 3.5, hr: 0.0001, food: F_FISH, eats: ['penguin', 'rabbit', 'sheep'], biomes: [B_TUNDRA], voice: 'growl', init: 1, group: 2, cap: 6 }),
+    lion: LAND({ name: 'Лев', legs: 1, diurnal: false, pack: true, frames: [
+      ['.........mmm.', 'm.......mmmmm', 't.......mmyky', 'tyyyyyyymmyyk', '.yyyyyyyymmm.', '.yyyyyyyyy...', '.y.y...y.y...'],
+      ['.........mmm.', 'm.......mmmmm', 't.......mmyky', 'tyyyyyyymmyyk', '.yyyyyyyymmm.', '.yyyyyyyyy...', 'y...y.y...y..']],
+      pals: [{ y: '#d8a850', m: '#8a4e1e', k: '#2a1a10', t: '#c8983e' }],
+      speed: 0.012, run: 0.072, stam: 220, vision: 11, pounce: 4, hr: 0.00011, eats: ['zebra', 'camel', 'deer', 'cow', 'elephant'], biomes: [B_SAVANNA], voice: 'roar', init: 1, group: 3, cap: 10 }),
+    tiger: LAND({ name: 'Тигр', legs: 1, frames: [
+      ['..........o.o', 't.........ooo', 't.oqoqoqoooko', '.ooqoqoqoooow', '.oqoqoqoqoww.', '..wwwwwwww...', '..o.o...o.o..'],
+      ['..........o.o', 't.........ooo', 't.oqoqoqoooko', '.ooqoqoqoooow', '.oqoqoqoqoww.', '..wwwwwwww...', '.o...oo...o..']],
+      pals: [{ o: '#e8802a', q: '#1e1612', w: '#f6efe4', k: '#1e1612', t: '#e8802a' }],
+      speed: 0.013, run: 0.074, stam: 220, vision: 10, pounce: 4, hr: 0.00011, eats: ['deer', 'cow', 'sheep', 'zebra', 'elephant'], biomes: [B_JUNGLE], voice: 'roar', init: 1, group: 2, cap: 6 }),
+    croc: LAND({ name: 'Крокодил', legs: 1, amphib: true, lurker: true, thirsty: false, diurnal: false, frames: [
+      ['....d.d.d.......', '..ggggggggggkg..', 'gggggggggggggggg', '..llllllllllwlwl', '...g..g...g..g..'],
+      ['....d.d.d.......', '..ggggggggggkg..', 'gggggggggggggggg', '..llllllllllwlwl', '..g..g.....g.g..']],
+      pals: [{ g: '#4a6e34', d: '#2e4a22', k: '#e8d040', l: '#8aa060', w: '#f4f4ea' }],
+      speed: 0.007, run: 0.095, stam: 55, vision: 3, pounce: 3, hr: 0.0001, eats: ['frog', 'deer', 'zebra', 'cow', 'sheep', 'rabbit', 'chicken', 'camel'], biomes: [B_SWAMP, B_JUNGLE], voice: 'growl', init: 1, group: 2, cap: 8 }),
+    // ---- sea ----
+    fish: { kind: 'sea', name: 'Риби', school: true, frames: [['...oo..', 'o.oooko', '.oollll', 'o..ll..'], ['...oo..', '.ooooko', 'ooollll', '...ll..']],
+      pals: [{ o: '#ff9030', l: '#ffd08a', k: '#1a1a1a' }, { o: '#ffd23a', l: '#fff0a0', k: '#1a1a1a' }, { o: '#4aa0e0', l: '#bfe4ff', k: '#1a1a1a' }, { o: '#ff6a8a', l: '#ffc0d0', k: '#1a1a1a' }],
+      speed: 0.02, run: 0.05, stam: 200, vision: 4, hr: 0, init: 6, group: 5, cap: 80, breed: 0.6 },
+    whale: { kind: 'sea', name: 'Кит', deep: true, frames: [
+      ['..........bbbbbb....', 'b.......bbbbbbbbbbb.', 'bb....bbbbbbbbbbkbbb', '.bbbbbbbbbbbbbbbbbbb', 'bb..bbllllllllllllb.', 'b.....llllllllllll..', '.........f....f.....'],
+      ['..........bbbbbb....', '........bbbbbbbbbbb.', 'b.....bbbbbbbbbbkbbb', 'bbbbbbbbbbbbbbbbbbbb', 'bb..bbllllllllllllb.', '......llllllllllll..', '.........f....f.....']],
+      pals: [{ b: '#34506e', l: '#c8d6e2', k: '#101820', f: '#243a52' }],
+      speed: 0.01, run: 0.02, stam: 100, vision: 4, hr: 0, voice: 'whale', init: 2, cap: 6, breed: 0.1 },
+    shark: { kind: 'sea', name: 'Акула', frames: [
+      ['........g.....', 'g......ggg....', 'gg.ggggggggkgg', '.ggggwwwwwwwwg', 'g.....w..w....'],
+      ['........g.....', '.......ggg....', 'g..ggggggggkgg', 'gggggwwwwwwwwg', 'gg....w..w....']],
+      pals: [{ g: '#7c8a98', w: '#eef2f4', k: '#101010' }],
+      speed: 0.02, run: 0.07, stam: 220, vision: 9, hr: 0.00011, eats: ['fish'], init: 2, cap: 8, breed: 0.12 },
+    dolphin: { kind: 'sea', name: 'Дельфін', frames: [
+      ['......d.....', 'd..ddddddd..', 'dd.dddddddkd', '.dddlllllldd', 'd...l....l..'],
+      ['......d.....', '...ddddddd..', 'd..dddddddkd', 'ddddlllllldd', 'dd..l....l..']],
+      pals: [{ d: '#6a92bc', l: '#dfeaf4', k: '#101820' }],
+      speed: 0.024, run: 0.07, stam: 220, vision: 8, hr: 0.0001, eats: ['fish'], voice: 'dolphin', init: 1, group: 3, cap: 16, breed: 0.2 },
+    crab: { kind: 'beach', name: 'Краб', frames: [['rr....rr', 'r.k..k.r', '.rrrrrr.', 'rrrrrrrr', 'r.r..r.r'], ['.r....r.', 'r.k..k.r', '.rrrrrr.', 'rrrrrrrr', '.r.rr.r.']],
+      pals: [{ r: '#e04a2a', k: '#1a1a1a' }], speed: 0.01, run: 0.03, stam: 100, vision: 3, hr: 0, init: 4, group: 2, cap: 36, breed: 0.4 },
+    // ---- sky ----
+    bird: { kind: 'sky', name: 'Птахи', frames: [['k.....k', '.k...k.', '..kkk..'], ['.......', 'kkkkkkk', '..kkk..']], pals: [{ k: '#2a2a34' }], alt: 20, speed: 0.045, voice: 'tweet' },
+    gull: { kind: 'sky', name: 'Чайки', frames: [['k.......k', '.ww...ww.', '...wkw...'], ['.........', 'kwwwwwwwk', '....w....']], pals: [{ w: '#f6f6f6', k: '#50555c' }], alt: 18, speed: 0.04, voice: 'gull' },
+    eagle: { kind: 'sky', name: 'Орел', frames: [['k.........k', '.kk.....kk.', '..kkkwkkk..', '....kkk....', '....k.k....'], ['...........', 'kkkkkwkkkkk', '....kkk....', '....k.k....', '...........']],
+      pals: [{ k: '#5a3a20', w: '#f4f4f0' }], alt: 32, speed: 0.03, voice: 'screech', eats: ['rabbit', 'chicken', 'frog', 'fish'] },
+    bat: { kind: 'sky', name: 'Кажани', frames: [['k.....k', 'kk.k.kk', '.kkkkk.'], ['.......', '..kkk..', 'kkk.kkk']], pals: [{ k: '#2a2232' }], alt: 12, speed: 0.035, voice: 'squeak', night: true },
+    butterfly: { kind: 'sky', name: 'Метелик', frames: [['yy.yy', 'yykyy', '.y.y.'], ['..k..', '.yky.', '..k..']],
+      pals: [{ y: '#ffd23c', k: '#3a2a20' }, { y: '#ff7ab8', k: '#3a2a20' }, { y: '#6ab8ff', k: '#3a2a20' }, { y: '#f4f4f4', k: '#3a2a20' }], alt: 6, speed: 0.012, day: true },
+    firefly: { kind: 'sky', name: 'Світлячок', frames: [['y'], ['y']], pals: [{ y: '#eaff80' }], alt: 4, speed: 0.01, night: true }
+  };
+  function spriteCanvas(rows, pal, w, flip) {
+    const c = document.createElement('canvas'); c.width = w; c.height = rows.length;
+    const g = c.getContext('2d');
+    rows.forEach((row, y) => { for (let x = 0; x < w; x++) { const ch = row[flip ? w - 1 - x : x]; if (ch && ch !== '.') { g.fillStyle = pal[ch]; g.fillRect(x, y, 1, 1); } } });
+    return c;
+  }
+  for (const k in SPECIES) {
+    const S = SPECIES[k]; S.key = k;
+    S.h = S.frames[0].length; S.w = Math.max(...S.frames[0].map(r => r.length));
+    S.imgs = S.pals.map(pal => S.frames.map(fr => [spriteCanvas(fr, pal, S.w, false), spriteCanvas(fr, pal, S.w, true)]));
+    if (S.legs) {
+      const lie = Array(S.legs).fill('.'.repeat(S.w)).concat(S.frames[0].slice(0, S.h - S.legs));
+      S.lie = S.pals.map(pal => [spriteCanvas(lie, pal, S.w, false), spriteCanvas(lie, pal, S.w, true)]);
+    }
+    if (!S.stam) S.stam = 150;
+    if (!S.run) S.run = S.speed * 2;
+  }
+  for (const k in SPECIES) { const S = SPECIES[k]; if (S.eats) for (const e of S.eats) { const P = SPECIES[e]; (P.preyOf = P.preyOf || new Set()).add(k); } }
+  const EMO = {};
+  for (const [k, d] of Object.entries({
+    alarm: [['.yy.', '.yy.', '.yy.', '....', '.yy.'], { y: '#ffd23c' }],
+    angry: [['.rr.', '.rr.', '.rr.', '....', '.rr.'], { r: '#ff4a30' }],
+    zzz: [['wwww', '..w.', '.w..', 'wwww', '....'], { w: '#e8f0ff' }],
+    drop: [['..b..', '.bbb.', 'bbbbb', 'bbbbb', '.bbb.'], { b: '#5ab8ff' }],
+    leaf: [['...gg', '..ggg', '.ggg.', 'gg...', 'g....'], { g: '#7ad05a' }],
+    meat: [['.rr..', 'rrrr.', '.rrr.', '...w.', '....w'], { r: '#c0503a', w: '#f4efe0' }],
+    heart: [['.r.r.', 'rrrrr', 'rrrrr', '.rrr.', '..r..'], { r: '#ff5a7a' }]
+  })) EMO[k] = spriteCanvas(d[0], d[1], d[0][0].length, false);
+  function spriteIcon(k) {
+    const S = SPECIES[k], n = Math.max(S.w, S.h, 5);
+    const c = document.createElement('canvas'); c.width = n; c.height = n;
+    c.getContext('2d').drawImage(S.imgs[0][0][0], Math.floor((n - S.w) / 2), Math.floor((n - S.h) / 2));
+    return c;
+  }
+  const glowG = (() => {
+    const c = document.createElement('canvas'); c.width = c.height = 32;
+    const g = c.getContext('2d'), gr = g.createRadialGradient(16, 16, 0, 16, 16, 16);
+    gr.addColorStop(0, 'rgba(230,255,140,1)'); gr.addColorStop(0.35, 'rgba(170,255,80,0.35)'); gr.addColorStop(1, 'rgba(120,255,40,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 32, 32);
+    return c;
+  })();
+
+  const animals = [], predators = [];
+  let fc = 0, aid = 1, fitZ = 1, voiceCd = 60, selected = null;
+  const STEER = [0, 0.5, -0.5, 1.0, -1.0, 1.6, -1.6, 2.3, -2.3];
+  function tileAt(x, y) { const ix = Math.floor(x), iy = Math.floor(y); if (ix < 0 || iy < 0 || ix >= W || iy >= H) return -1; return iy * W + ix; }
+  function visibleT(x, y) { const sx = camX + x * SUB * zoom, sy = camY + y * SUB * zoom; return sx > -20 && sy > -20 && sx < canvas.width + 20 && sy < canvas.height + 20; }
+  function canBe(S, i) {
+    if (i < 0) return false;
+    const h = hgt[i], c = cover[i];
+    switch (S.kind) {
+      case 'land':
+        if (c === C_LAVA) return false;
+        if (h < SEA) return c === C_ICE || !!S.swim || (!!S.amphib && h > DEEP + 0.04);
+        return h < ROCK;
+      case 'sea': return h < SEA && (!S.deep || h < DEEP + 0.03);
+      case 'beach': return h >= SEA - 0.015 && h < SAND + 0.02 && c !== C_LAVA;
+      default: return true;
+    }
+  }
+  function passable(S, j) { return j >= 0 && canBe(S, j) && (S.kind === 'sea' || (cover[j] !== C_FIRE && cover[j] !== C_LAVA)); }
+  function nearWater(i) {
+    if (i < 0) return false;
+    const x = i % W, y = (i / W) | 0;
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) { const j = tileAt(x + dx, y + dy); if (j >= 0 && hgt[j] < SEA && cover[j] !== C_ICE) return true; }
+    return false;
+  }
+  function foodAt(S, i) {
+    if (i < 0 || grazed[i] > 0) return false;
+    const h = hgt[i], c = cover[i];
+    if (c === C_FIRE || c === C_LAVA || c === C_BURNT) return false;
+    switch (S.food) {
+      case F_GRASS: return isVeg(h) && c === C_NONE && biome[i] !== B_DESERT && (snow[i] < 150 || biome[i] === B_TUNDRA);
+      case F_BROWSE: return isVeg(h) && (c === C_TREE || c === C_NONE);
+      case F_DESERT: return h >= SEA && h < HILL;
+      case F_FISH: return nearWater(i);
+      case F_BUGS: return h > DEEP;
+    }
+    return false;
+  }
+  function foodAround(a) {
+    let n = 0;
+    for (let dy = -3; dy <= 3; dy++) for (let dx = -3; dx <= 3; dx++) if (foodAt(a.S, tileAt(a.x + dx, a.y + dy))) n++;
+    return n;
+  }
+  function findNear(a, pred, maxR) {
+    let best = null, bd = 1e9;
+    for (let k = 0; k < 16; k++) {
+      const an = k * Math.PI / 8 + rnd() * 0.3, cx = Math.cos(an), cy = Math.sin(an);
+      for (let r = 1; r <= maxR; r += (r < 6 ? 1 : 2)) {
+        const j = tileAt(a.x + cx * r, a.y + cy * r);
+        if (j < 0) break;
+        if (pred(j)) { if (r < bd) { bd = r; best = { x: a.x + cx * r, y: a.y + cy * r }; } break; }
+      }
+    }
+    return best;
+  }
+  function steer(a, dx, dy, speed) {
+    if (Math.abs(dx) + Math.abs(dy) < 1e-6) { a.vx = a.vy = 0; return; }
+    const base = Math.atan2(dy, dx);
+    for (const off of STEER) {
+      const an = base + off, vx = Math.cos(an) * speed, vy = Math.sin(an) * speed;
+      if (passable(a.S, tileAt(a.x + vx * 8, a.y + vy * 8)) && passable(a.S, tileAt(a.x + vx, a.y + vy))) { a.vx = vx; a.vy = vy; return; }
+    }
+    a.vx = a.vy = 0; a.stuck++;
+  }
+  function spawnAnimal(k, x, y, extra) {
+    if (animals.length >= 600) return null;
+    const S = SPECIES[k];
+    const a = {
+      S, x, y, vx: 0, vy: 0, dir: rnd() < 0.5 ? -1 : 1, t: rnd() * 10, timer: 0, think: (rnd() * 30) | 0, state: 'wander', z: 0, vz: 0,
+      pal: (rnd() * S.pals.length) | 0, hunger: rnd() * 0.35, thirst: rnd() * 0.35, stam: S.stam || 100, phase: rnd() * 6.28, id: aid++,
+      hx: x, hy: y, baby: 0, jump: 0, age: (S.adult || 0) + rnd() * 20000, life: 32000 + rnd() * 50000, mateCd: rnd() * 1500, stuck: 0, emoT: 0, wa: rnd() * 6.28
+    };
+    if (extra) Object.assign(a, extra);
+    if (a.pal >= S.pals.length) a.pal = 0;
+    animals.push(a);
+    return a;
+  }
+  function randomTile(pred) {
+    for (let k = 0; k < 300; k++) {
+      const x = (rnd() * W) | 0, y = (rnd() * H) | 0, i = y * W + x;
+      if (pred(i)) return { x: x + 0.5, y: y + 0.5 };
+    }
+    return null;
+  }
+  function spawnFlock(k, n, x, y, vx, vy) {
+    const L = Math.hypot(vx, vy) || 1, hx = vx / L, hy = vy / L, px = -hy, py = hx;
+    for (let q = 0; q < n; q++) {
+      const row = Math.ceil(q / 2), side = q % 2 ? 1 : -1;
+      spawnAnimal(k, x - hx * row * 1.6 + px * side * row * 1.3, y - hy * row * 1.6 + py * side * row * 1.3, { vx, vy });
+    }
+  }
+  function spawnFlockEdge(k, n) {
+    const side = (rnd() * 4) | 0;
+    let x, y;
+    if (side === 0) { x = -3; y = rnd() * H; } else if (side === 1) { x = W + 3; y = rnd() * H; }
+    else if (side === 2) { x = rnd() * W; y = -3; } else { x = rnd() * W; y = H + 3; }
+    const tx = W * (0.25 + rnd() * 0.5), ty = H * (0.25 + rnd() * 0.5), d = Math.hypot(tx - x, ty - y), s = SPECIES[k].speed;
+    spawnFlock(k, n, x, y, (tx - x) / d * s, (ty - y) / d * s);
+  }
+  function spawnGroup(k, x, y, n) {
+    const S = SPECIES[k];
+    const lead = spawnAnimal(k, x, y);
+    if (!lead) return null;
+    for (let m = 1; m < n; m++) {
+      const nx = x + (rnd() - 0.5) * 3, ny = y + (rnd() - 0.5) * 3;
+      if (S.school) spawnAnimal(k, x + (rnd() - 0.5) * 2, y + (rnd() - 0.5) * 2, { lead, ox: (rnd() - 0.5) * 3, oy: (rnd() - 0.5) * 3, pal: lead.pal });
+      else if (canBe(S, tileAt(nx, ny))) spawnAnimal(k, nx, ny, { lead });
+    }
+    return lead;
+  }
+  function populate() {
+    animals.length = 0; selected = null;
+    for (const k in SPECIES) {
+      const S = SPECIES[k];
+      if (S.kind === 'sky' || !S.init) continue;
+      for (let g = 0; g < S.init; g++) {
+        const p = randomTile(i => canBe(S, i) && (S.kind !== 'land' || hgt[i] >= SEA || S.lurker) && (!S.biomes || S.biomes.includes(biome[i])));
+        if (!p) break;
+        spawnGroup(k, p.x, p.y, S.group || 1);
+      }
+    }
+    spawnFlockEdge('bird', 6); spawnFlockEdge('gull', 3);
+    const p = randomTile(i => hgt[i] >= SEA);
+    if (p) spawnAnimal('eagle', p.x, p.y, { cx: p.x, cy: p.y, hunger: 0.3 });
+  }
+  function spawnFromTool(k, x, y) {
+    const S = SPECIES[k];
+    if (S.kind === 'sky') {
+      if (k === 'bird' || k === 'gull') { const an = rnd() * Math.PI * 2; spawnFlock(k, 5, x, y, Math.cos(an) * S.speed, Math.sin(an) * S.speed); }
+      else if (k === 'eagle') spawnAnimal(k, x, y, { cx: x, cy: y, hunger: 0.4 });
+      else for (let q = 0; q < 3; q++) spawnAnimal(k, x + rnd() - 0.5, y + rnd() - 0.5, { hx: x, hy: y });
+    } else {
+      if (!canBe(S, tileAt(x, y))) { if (cool('nohab', 1200)) showToast('Тут цей звір не виживе', 1400); return; }
+      if (S.school) spawnGroup(k, x, y, 5); else spawnAnimal(k, x, y);
+    }
+    SFX.pop();
+    if (S.voice && cool('spawnvoice', 700)) SFX[S.voice](0.8);
+  }
+  const DEATH = { burn: 'Згорів', drown: 'Потонув', eaten: 'Його з\'їли', starve: 'Помер з голоду чи спраги', old: 'Помер від старості', poof: 'Зник' };
+  function kill(a, how) {
+    if (a.dead) return;
+    a.dead = true; a.how = how;
+    const bx = a.x * SUB, by = a.y * SUB, vis = visibleT(a.x, a.y);
+    if (how === 'burn') { for (let q = 0; q < 4; q++) smokeAt(bx, by - 2); emberAt(bx, by); }
+    else if (how === 'drown') { burst('debris', bx, by, 8, 0.7, ['#dff2ff', '#9fd4ff'], 18); if (vis && cool('drown', 200)) SFX.splash(0.1); }
+    else if (how === 'eaten') { burst('debris', bx, by - 1, 8, 0.6, ['#9a3a2a', '#c8b8a0'], 18); if (vis && cool('eat', 200)) SFX.poof(); }
+    else burst('dust', bx, by - 1, 8, 0.6, ['#c2ad86'], 18);
+  }
+  function findPrey(a, range) {
+    let best = null, bs = 1e9;
+    for (const b of animals) {
+      if (b.dead || b.state === 'tossed' || !a.S.eats.includes(b.S.key)) continue;
+      if (b.S.brave && b.baby <= 0) continue;
+      const dx = b.x - a.x, dy = b.y - a.y, d = Math.hypot(dx, dy);
+      if (d > range) continue;
+      const score = d - (b.baby > 0 ? 3 : 0) - (b.state === 'sleep' ? 2 : 0);
+      if (score < bs) { bs = score; best = b; }
+    }
+    return best;
+  }
+  function findMate(a) {
+    let cnt = 0, best = null, bd = 400;
+    for (const b of animals) {
+      if (b.S !== a.S || b.dead) continue;
+      cnt++;
+      if (b === a || b.baby > 0 || b.age < a.S.adult || b.mateCd > 0 || b.state === 'mate' || b.state === 'flee' || b.hunger > 0.55) continue;
+      const d = (b.x - a.x) ** 2 + (b.y - a.y) ** 2;
+      if (d < bd) { bd = d; best = b; }
+    }
+    return cnt < a.S.cap ? best : null;
+  }
+  function breed(a, p) {
+    a.mateCd = p.mateCd = 2600 + rnd() * 1400;
+    a.hunger += 0.15; p.hunger += 0.15;
+    a.emo = p.emo = 'heart'; a.emoT = p.emoT = 120;
+    const n = a.S.litter || 1;
+    for (let q = 0; q < n; q++) {
+      const b = spawnAnimal(a.S.key, a.x + (rnd() - 0.5) * 0.6, a.y + (rnd() - 0.5) * 0.6, { baby: a.S.adult, mom: a, lead: a.lead || a, age: 0, hunger: 0.1, thirst: 0.1, emo: 'heart', emoT: 120 });
+      if (b) b.life = 32000 + rnd() * 50000;
+    }
+    if (visibleT(a.x, a.y) && cool('breed', 400)) SFX.pop();
+  }
+  function catchPrey(a, tg) {
+    kill(tg, 'eaten');
+    a.hunger = 0; a.target = null;
+    if (a.S.kind === 'sea') { a.state = 'wander'; a.timer = 0; return; }
+    a.state = 'feast'; a.timer = 160; a.vx = a.vy = 0;
+    if (a.S.pack) for (const b of predators) {
+      if (b !== a && b.S === a.S && !b.dead && Math.hypot(b.x - a.x, b.y - a.y) < 6 && (b.state === 'chase' || b.state === 'stalk')) {
+        b.state = 'feast'; b.timer = 140; b.target = null; b.vx = b.vy = 0; b.hunger = Math.max(0, b.hunger - 0.6);
+      }
+    }
+    if (visibleT(a.x, a.y) && a.S.voice && cool('catch', 900)) SFX[a.S.voice](0.9);
+  }
+  function startFlee(a, fx, fy) {
+    const l = Math.hypot(fx, fy) || 1;
+    a.state = 'flee'; a.fleeT = 90 + ((rnd() * 40) | 0); a.fx = fx / l; a.fy = fy / l; a.partner = null;
+  }
+  function perceive(a) {
+    const S = a.S;
+    if (a.state === 'flee' || a.state === 'tossed') return;
+    let fx = 0, fy = 0, threat = false;
+    if (S.kind !== 'sea') for (let k = 0; k < 8; k++) {
+      const an = k * Math.PI / 4, cx = Math.cos(an), cy = Math.sin(an), j = tileAt(a.x + cx * 2.5, a.y + cy * 2.5);
+      if (j >= 0 && (cover[j] === C_FIRE || cover[j] === C_LAVA)) { fx -= cx; fy -= cy; threat = true; }
+    }
+    if (S.preyOf && !(S.brave && a.baby <= 0)) {
+      for (const p of predators) {
+        if (p.dead || !S.preyOf.has(p.S.key)) continue;
+        const dx = a.x - p.x, dy = a.y - p.y, d = Math.hypot(dx, dy) || 0.1;
+        let r = (p.state === 'chase' || p.state === 'dive') ? S.vision : p.state === 'stalk' ? 2.5 : 3.5;
+        if (p.state === 'feast' || p.state === 'rest' || p.state === 'sleep' || p.state === 'lurk') r = 1.6;
+        if (a.state === 'sleep') r = Math.min(r, 2.5);
+        if (d < r) { fx += dx / d * (r - d + 1); fy += dy / d * (r - d + 1); threat = true; }
+      }
+    }
+    if (threat) {
+      startFlee(a, fx, fy);
+      if (S.herd || S.school) for (const b of animals) {
+        if (b !== a && b.S === S && !b.dead && b.state !== 'flee' && b.state !== 'tossed' && Math.abs(b.x - a.x) < 5 && Math.abs(b.y - a.y) < 5) startFlee(b, fx, fy);
+      }
+    }
+  }
+  function wanderMove(a) {
+    const S = a.S;
+    if (a.lead && a.lead.dead) a.lead = a.lead.lead && !a.lead.lead.dead ? a.lead.lead : null;
+    if (--a.timer <= 0) {
+      a.timer = 60 + ((rnd() * 150) | 0);
+      const L = a.lead;
+      if (L && Math.hypot(L.x - a.x, L.y - a.y) > 3) { a.wa = Math.atan2(L.y - a.y, L.x - a.x); a.idle = false; }
+      else { a.idle = rnd() < (S.kind === 'sea' ? 0.1 : 0.4); a.wa = rnd() * Math.PI * 2; }
+    }
+    if (a.idle) { a.vx = a.vy = 0; return; }
+    steer(a, Math.cos(a.wa), Math.sin(a.wa), S.speed);
+    if (!a.vx && !a.vy) a.timer = 0;
+  }
+  function brain(a) {
+    const S = a.S, night = dark > 0.35, i = tileAt(a.x, a.y);
+    if (S.thirsty && a.thirst > 0.95 && a.state !== 'drink' && a.state !== 'toWater' && a.state !== 'flee' && a.state !== 'feast') { a.state = 'wander'; a.think = 0; a.target = null; a.partner = null; }
+    if (a.hunger > 1.0 && (a.state === 'rest' || a.state === 'sleep' || a.state === 'mate')) { a.state = 'wander'; a.think = 0; a.partner = null; }
+    switch (a.state) {
+      case 'flee': {
+        if (--a.fleeT <= 0) { a.state = 'wander'; a.timer = 0; break; }
+        const sp = a.stam > 0 ? S.run : S.speed * 1.3;
+        if (a.stam > 0) a.stam--;
+        steer(a, a.fx, a.fy, sp);
+        return;
+      }
+      case 'eat': {
+        a.vx = a.vy = 0; a.hunger = Math.max(0, a.hunger - 0.008);
+        if (fc % 14 === 0) addP('debris', a.x * SUB + a.dir * S.w * 0.4, a.y * SUB - 1, (rnd() - 0.5) * 0.4, -0.3 - rnd() * 0.3, 16, { c: S.food === F_FISH ? '#9fd4ff' : '#7ac05a', drag: 0.94 });
+        if (--a.timer <= 0 || a.hunger <= 0.02) {
+          if (i >= 0 && (S.food === F_GRASS || S.food === F_BROWSE)) {
+            if (S.key === 'elephant' && cover[i] === C_TREE && rnd() < 0.3) cover[i] = C_NONE;
+            grazed[i] = 260; dirty = true;
+          }
+          a.state = 'wander'; a.timer = 0;
+        }
+        return;
+      }
+      case 'drink': {
+        a.vx = a.vy = 0; a.thirst = Math.max(0, a.thirst - 0.015);
+        if (fc % 20 === 0) addP('splash', a.x * SUB + a.dir * S.w * 0.5, a.y * SUB, 0, 0, 8);
+        if (--a.timer <= 0) { a.state = 'wander'; a.timer = 0; }
+        return;
+      }
+      case 'feast': {
+        a.vx = a.vy = 0;
+        if (fc % 16 === 0) addP('debris', a.x * SUB + a.dir * S.w * 0.4, a.y * SUB - 1, (rnd() - 0.5) * 0.5, -0.3, 14, { c: '#9a3a2a', drag: 0.93 });
+        if (--a.timer <= 0) { a.state = 'rest'; a.timer = 240; }
+        return;
+      }
+      case 'rest': {
+        a.vx = a.vy = 0;
+        if (--a.timer > 0 && a.hunger < 0.8 && a.thirst < 0.8) return;
+        a.state = 'wander'; a.timer = 0; break;
+      }
+      case 'sleep': {
+        a.vx = a.vy = 0;
+        if (night && a.hunger < 0.85 && a.thirst < 0.85) return;
+        a.state = 'wander'; a.timer = 0; break;
+      }
+      case 'mate': {
+        const p = a.partner;
+        if (!p || p.dead || p.state === 'flee' || p.partner !== a) { a.state = 'wander'; a.partner = null; break; }
+        const dx = p.x - a.x, dy = p.y - a.y, d = Math.hypot(dx, dy);
+        if (d < 1.1) { breed(a, p); a.state = p.state = 'wander'; a.timer = p.timer = 0; a.partner = p.partner = null; break; }
+        steer(a, dx, dy, S.speed);
+        if (a.stuck > 90) { a.state = 'wander'; a.stuck = 0; a.partner = null; }
+        return;
+      }
+      case 'stalk': case 'chase': {
+        const tg = a.target;
+        if (!tg || tg.dead || tg.state === 'tossed') { a.target = null; a.state = 'wander'; a.timer = 0; break; }
+        const dx = tg.x - a.x, dy = tg.y - a.y, d = Math.hypot(dx, dy);
+        if (d > S.vision * 2.5) { a.target = null; a.state = 'wander'; break; }
+        if (a.state === 'stalk') {
+          if (d < S.pounce) a.state = 'chase';
+          else { steer(a, dx, dy, S.speed * 1.3); return; }
+        }
+        if (d < 0.8) { catchPrey(a, tg); return; }
+        if (a.stam <= 0) { a.target = null; a.state = 'rest'; a.timer = 220; return; }
+        a.stam--;
+        steer(a, dx + tg.vx * 10, dy + tg.vy * 10, S.run);
+        return;
+      }
+      case 'lurk': {
+        a.vx = a.vy = 0;
+        if (a.hunger < 0.3 || a.hunger > 0.9) { a.state = 'wander'; break; }
+        if ((fc + a.id) % 10 === 0) { const tg = findPrey(a, S.pounce); if (tg) { a.target = tg; a.state = 'chase'; a.stam = S.stam; } }
+        return;
+      }
+      case 'follow': {
+        const m = a.mom;
+        if (!m || m.dead || a.baby <= 0) { a.state = 'wander'; a.mom = null; break; }
+        if (m.state === 'flee') { a.state = 'flee'; a.fleeT = m.fleeT; a.fx = m.fx; a.fy = m.fy; return; }
+        const gx = m.x - m.dir * 1.2, gy = m.y + 0.3, dx = gx - a.x, dy = gy - a.y, d = Math.hypot(dx, dy);
+        if ((m.state === 'sleep' || m.state === 'rest') && d < 1.5) { a.state = 'sleep'; return; }
+        if (d < 0.6) { a.vx = a.vy = 0; } else steer(a, dx, dy, d > 3 ? S.run : S.speed * 1.1);
+        a.hunger = Math.min(a.hunger, 0.3); a.thirst = Math.min(a.thirst, 0.3);
+        if (--a.think > 0) return;
+        a.think = 40; break;
+      }
+      case 'toFood': case 'toWater': {
+        const g = a.goal, dx = g.x - a.x, dy = g.y - a.y, d = Math.hypot(dx, dy);
+        if (a.state === 'toWater' && nearWater(i)) {
+          if (S.lurker) { a.state = 'lurk'; return; }
+          a.state = 'drink'; a.timer = 80; return;
+        }
+        if (a.state === 'toFood' && d < 0.7) { if (foodAt(S, i)) { a.state = 'eat'; a.timer = 90; } else { a.state = 'wander'; a.timer = 0; } return; }
+        if (a.stuck > 80) { a.stuck = 0; a.state = 'wander'; a.timer = 0; a.waterMem = null; break; }
+        steer(a, dx, dy, S.speed * 1.15);
+        if (--a.think > 0) return;
+        a.think = 40; break;
+      }
+    }
+    if (a.state === 'wander' && --a.think > 0) { wanderMove(a); return; }
+    a.think = 25 + ((rnd() * 20) | 0);
+    if (S.diurnal && night && a.hunger < 0.85 && a.thirst < 0.85) { a.state = 'sleep'; a.vx = a.vy = 0; return; }
+    if (S.nocturnal && !night && a.hunger < 0.55 && a.thirst < 0.6 && rnd() < 0.35) { a.state = 'rest'; a.timer = 360; a.vx = a.vy = 0; return; }
+    if (a.baby > 0 && a.mom && !a.mom.dead) { a.state = 'follow'; return; }
+    if (S.thirsty && a.thirst > 0.6) {
+      if (nearWater(i)) { a.state = 'drink'; a.timer = 80; return; }
+      const w = (a.waterMem && rnd() < 0.7) ? a.waterMem : findNear(a, j => hgt[j] < SEA && cover[j] !== C_ICE, 24);
+      if (w) { a.state = 'toWater'; a.goal = { x: w.x, y: w.y }; a.waterMem = w; a.stuck = 0; return; }
+      a.thirst = Math.max(0, a.thirst - 0.25);
+    }
+    if (S.eats && a.hunger > 0.45) {
+      if (S.lurker && a.hunger < 0.85) {
+        if (nearWater(i) || hgt[i] < SEA) { a.state = 'lurk'; return; }
+        const w = findNear(a, j => hgt[j] < SEA && hgt[j] > DEEP + 0.04, 15);
+        if (w) { a.state = 'toWater'; a.goal = w; a.stuck = 0; return; }
+      } else {
+        let tg = null;
+        if (S.pack) for (const b of predators) if (b !== a && b.S === S && b.target && !b.target.dead && Math.hypot(b.x - a.x, b.y - a.y) < 8) { tg = b.target; break; }
+        if (!tg) tg = findPrey(a, S.vision);
+        if (!tg) {
+          const far = findPrey(a, 45);
+          if (far) { a.state = 'toFood'; a.prowl = true; a.goal = { x: far.x, y: far.y }; a.stuck = 0; return; }
+        }
+        if (tg) {
+          a.target = tg; a.state = 'stalk'; a.stam = Math.max(a.stam, S.stam * 0.6);
+          if (S.pack) for (const b of predators) if (b !== a && b.S === S && !b.target && (b.state === 'wander' || b.state === 'rest') && Math.hypot(b.x - a.x, b.y - a.y) < 8) { b.target = tg; b.state = 'stalk'; }
+          return;
+        }
+      }
+    }
+    if (S.food && a.hunger > 0.45) {
+      if (foodAt(S, i)) { a.state = 'eat'; a.timer = 90; a.vx = a.vy = 0; return; }
+      const f = findNear(a, j => foodAt(S, j), 20);
+      if (f) { a.state = 'toFood'; a.prowl = false; a.goal = f; a.stuck = 0; return; }
+    }
+    if (a.baby <= 0 && a.age > S.adult && a.mateCd <= 0 && a.hunger < 0.4 && a.thirst < 0.55 && !night && rnd() < 0.5 && (!S.food || S.eats || foodAround(a) >= 5)) {
+      const m = findMate(a);
+      if (m) { a.state = 'mate'; a.partner = m; m.state = 'mate'; m.partner = a; a.stuck = m.stuck = 0; return; }
+    }
+    if (!a.lead && S.herd && rnd() < 0.3) {
+      for (const b of animals) if (b !== a && b.S === S && !b.dead && b.lead !== a && Math.abs(b.x - a.x) < 6 && Math.abs(b.y - a.y) < 6) { a.lead = b.lead || b; break; }
+    }
+    a.state = 'wander';
+    wanderMove(a);
+  }
+  function seaBrain(a) {
+    const S = a.S;
+    if (a.state === 'flee') {
+      if (--a.fleeT <= 0) a.state = 'wander';
+      else { steer(a, a.fx, a.fy, a.stam-- > 0 ? S.run : S.speed); return; }
+    }
+    if (S.eats) {
+      if (a.state === 'chase') {
+        const tg = a.target;
+        if (!tg || tg.dead) { a.state = 'wander'; a.target = null; }
+        else {
+          const dx = tg.x - a.x, dy = tg.y - a.y, d = Math.hypot(dx, dy);
+          if (d < 0.8) { catchPrey(a, tg); return; }
+          if (a.stam-- <= 0 || d > S.vision * 1.8) { a.state = 'wander'; a.target = null; a.stam = 0; }
+          else { steer(a, dx, dy, S.run); return; }
+        }
+      } else if (a.hunger > 0.5 && (fc + a.id) % 30 === 0) {
+        const tg = findPrey(a, S.vision);
+        if (tg) { a.target = tg; a.state = 'chase'; a.stam = S.stam; return; }
+        const far = findPrey(a, 45);
+        if (far) { a.wa = Math.atan2(far.y - a.y, far.x - a.x); a.idle = false; a.timer = 90; }
+      }
+    }
+    if (S.school && a.lead) {
+      if (a.lead.dead) a.lead = null;
+      else {
+        const L = a.lead, dx = L.x + a.ox - a.x, dy = L.y + a.oy - a.y, d = Math.hypot(dx, dy);
+        steer(a, dx + L.vx * 20, dy + L.vy * 20, Math.min(S.run, S.speed * (0.8 + d)));
+        return;
+      }
+    }
+    wanderMove(a);
+  }
+  function move(a) {
+    if (!a.vx && !a.vy) return;
+    const nx = a.x + a.vx, ny = a.y + a.vy, j = tileAt(nx, ny);
+    if (passable(a.S, j)) { a.x = nx; a.y = ny; a.stuck = 0; }
+    else { a.vx = a.vy = 0; a.stuck++; }
+    if (a.vx > 0.0005) a.dir = 1; else if (a.vx < -0.0005) a.dir = -1;
+    a.t += (Math.abs(a.vx) + Math.abs(a.vy)) * 9;
+  }
+  function splashAt(a) {
+    burst('debris', a.x * SUB, a.y * SUB, 6, 0.6, ['#dff2ff', '#ffffff'], 16);
+    if (visibleT(a.x, a.y) && cool('dsplash', 200)) SFX.splash(0.08);
+  }
+  function updateWalker(a) {
+    const S = a.S;
+    if (a.state === 'tossed') {
+      a.x = clamp(a.x + a.vx, 0, W - 0.01); a.y = clamp(a.y + a.vy, 0, H - 0.01);
+      a.z += a.vz; a.vz -= 0.06 * K; a.t += 0.6;
+      if (a.z <= 0) {
+        a.z = 0; a.vx = a.vy = 0; a.state = 'wander'; a.timer = 30;
+        const i = tileAt(a.x, a.y);
+        if (!canBe(S, i)) kill(a, i >= 0 && hgt[i] < SEA ? 'drown' : 'burn');
+        else if (visibleT(a.x, a.y) && cool('thud', 150)) SFX.rumble();
+      }
+      return;
+    }
+    const i = tileAt(a.x, a.y);
+    if (i < 0) { a.dead = true; return; }
+    const c = cover[i];
+    if (S.kind !== 'sea' && (c === C_FIRE || c === C_LAVA)) return kill(a, 'burn');
+    if (!canBe(S, i)) {
+      if (S.kind === 'land' && hgt[i] < SEA) return kill(a, 'drown');
+      if (S.kind === 'sea') return kill(a, 'poof');
+    }
+    if (S.kind !== 'sea') for (const t of tornados) {
+      const dx = a.x - t.x, dy = a.y - t.y;
+      if (dx * dx + dy * dy < 2.2) { a.state = 'tossed'; a.z = 1; a.vz = (1.5 + rnd()) * K; a.vx = (rnd() - 0.5) * 0.25; a.vy = (rnd() - 0.5) * 0.25; return; }
+    }
+    a.age++;
+    if (a.baby > 0) a.baby--;
+    if (a.mateCd > 0) a.mateCd--;
+    if (a.emoT > 0) a.emoT--;
+    if (a.stam < S.stam && a.state !== 'chase' && a.state !== 'flee') a.stam += 0.4;
+    const hr = S.hr || 0;
+    a.hunger += a.state === 'sleep' ? hr * 0.4 : hr;
+    if (S.thirsty) a.thirst += a.state === 'sleep' ? 0.00012 : 0.00032;
+    if (a.hunger > 1.25 || a.thirst > 1.25) return kill(a, 'starve');
+    if (a.age > a.life) return kill(a, 'old');
+    if ((a.id + fc) % 10 === 0) perceive(a);
+    if (S.kind === 'land') brain(a); else seaBrain(a);
+    move(a);
+    const sp = Math.abs(a.vx) + Math.abs(a.vy);
+    if (S.key === 'whale' && rnd() < 0.004) {
+      for (let q = 0; q < 12; q++) addP('debris', a.x * SUB + a.dir * S.w * 0.3, a.y * SUB - S.h, (rnd() - 0.5) * 0.4, -0.6 - rnd() * 0.8, 34, { c: '#eaf6ff', drag: 0.96 });
+    }
+    if (S.key === 'dolphin') {
+      if (!a.jump && sp > 0.005 && rnd() < 0.006) { a.jump = 0.001; splashAt(a); }
+      if (a.jump) { a.jump += 0.03; if (a.jump >= 1) { a.jump = 0; splashAt(a); } }
+    }
+    if (S.key === 'shark' && sp > 0.005 && fc % 5 === 0) addP('splash', a.x * SUB - a.dir * S.w * 0.5, a.y * SUB, 0, 0, 10);
+  }
+  function updateFlyer(a) {
+    const S = a.S;
+    a.t += S.key === 'eagle' ? 0.05 : S.key === 'butterfly' ? 0.35 : 0.22;
+    if (S.key === 'eagle') {
+      if (a.alt === undefined) a.alt = S.alt;
+      a.hunger = (a.hunger || 0) + 0.00028;
+      if (a.state === 'dive') {
+        const tg = a.target;
+        if (!tg || tg.dead) a.state = 'climb';
+        else {
+          const dx = tg.x - a.x, dy = tg.y - a.y, d = Math.hypot(dx, dy) || 0.01;
+          a.x += dx / d * Math.min(0.09, d); a.y += dy / d * Math.min(0.09, d);
+          a.dir = dx >= 0 ? 1 : -1; a.t += 0.2;
+          a.alt = S.alt * Math.min(1, d / 6);
+          if (d < 0.5) { kill(tg, 'eaten'); a.hunger = 0; a.state = 'climb'; a.target = null; }
+        }
+      } else if (a.state === 'climb') {
+        a.alt = Math.min(S.alt, a.alt + 0.35); a.t += 0.15;
+        if (a.alt >= S.alt) { a.state = 'circle'; a.cx = a.x - Math.cos(a.phase) * 7; a.cy = a.y - Math.sin(a.phase) * 5; }
+      } else {
+        a.phase += 0.01; a.cx += wx * 0.003; a.cy += wy * 0.003;
+        const nx = a.cx + Math.cos(a.phase) * 7, ny = a.cy + Math.sin(a.phase) * 5;
+        a.dir = nx >= a.x ? 1 : -1; a.x = nx; a.y = ny;
+        if (a.hunger > 0.5 && (fc + a.id) % 30 === 0) {
+          const tg = findPrey(a, 12);
+          if (tg) { a.target = tg; a.state = 'dive'; if (visibleT(a.x, a.y) && cool('screech', 1500)) SFX.screech(0.8); }
+        }
+        if (a.cx < -10 || a.cx > W + 10 || a.cy < -10 || a.cy > H + 10) a.dead = true;
+      }
+    } else if (S.key === 'butterfly' || S.key === 'bat' || S.key === 'firefly') {
+      a.vx += (rnd() - 0.5) * S.speed * 0.4 + (a.hx - a.x) * 0.0006;
+      a.vy += (rnd() - 0.5) * S.speed * 0.4 + (a.hy - a.y) * 0.0006;
+      const sp = Math.hypot(a.vx, a.vy);
+      if (sp > S.speed) { a.vx *= S.speed / sp; a.vy *= S.speed / sp; }
+      a.x += a.vx; a.y += a.vy;
+      if (Math.abs(a.vx) > 0.002) a.dir = a.vx > 0 ? 1 : -1;
+      if (a.auto && ((S.night && dark < 0.12) || (S.day && dark > 0.3))) a.dead = true;
+    } else {
+      a.x += a.vx; a.y += a.vy + Math.sin(a.t * 0.4 + a.phase) * 0.004;
+      a.dir = a.vx >= 0 ? 1 : -1;
+      if (a.x < -12 || a.x > W + 12 || a.y < -12 || a.y > H + 12) a.dead = true;
+    }
+  }
+  function manageAnimals() {
+    const cnt = {};
+    for (const a of animals) cnt[a.S.key] = (cnt[a.S.key] || 0) + 1;
+    const c = k => cnt[k] || 0;
+    if (dark < 0.25) {
+      if (c('bird') < 12 && rnd() < 0.25) spawnFlockEdge('bird', 5 + ((rnd() * 3) | 0));
+      if (c('gull') < 6 && rnd() < 0.15) spawnFlockEdge('gull', 3 + ((rnd() * 2) | 0));
+      if (c('eagle') < 1 && rnd() < 0.1) { const p = randomTile(i => hgt[i] >= SEA); if (p) spawnAnimal('eagle', p.x, p.y, { cx: p.x, cy: p.y }); }
+      if (c('butterfly') < 10 && rnd() < 0.5) {
+        const p = randomTile(i => isVeg(hgt[i]) && (biome[i] === B_TEMP || biome[i] === B_JUNGLE || biome[i] === B_SAVANNA));
+        if (p) spawnAnimal('butterfly', p.x, p.y, { hx: p.x, hy: p.y, auto: true });
+      }
+    }
+    if (dark > 0.35) {
+      if (c('bat') < 12 && rnd() < 0.4) { const p = randomTile(i => hgt[i] >= GRASS); if (p) for (let q = 0; q < 3; q++) spawnAnimal('bat', p.x + rnd() * 2, p.y + rnd() * 2, { hx: p.x, hy: p.y, auto: true }); }
+      if (c('firefly') < 40 && rnd() < 0.8) {
+        const p = randomTile(i => cover[i] === C_TREE && (biome[i] === B_TEMP || biome[i] === B_SWAMP || biome[i] === B_JUNGLE));
+        if (p) for (let q = 0; q < 4; q++) spawnAnimal('firefly', p.x + rnd() * 3 - 1.5, p.y + rnd() * 3 - 1.5, { hx: p.x, hy: p.y, auto: true });
+      }
+    }
+    if (((fc / 60) | 0) % 6 === 0) {
+      for (const k in SPECIES) {
+        const S = SPECIES[k];
+        if (S.kind !== 'sea' && S.kind !== 'beach') continue;
+        const n = c(k);
+        if (n < 2 || n >= S.cap || rnd() > S.breed) continue;
+        const pool = animals.filter(a => a.S === S && !a.dead);
+        const par = pool[(rnd() * pool.length) | 0];
+        if (!par || (S.eats && par.hunger > 0.6)) continue;
+        const nx = par.x + (rnd() - 0.5) * 2, ny = par.y + (rnd() - 0.5) * 2;
+        if (!canBe(S, tileAt(nx, ny))) continue;
+        if (S.school) { const L = par.lead || par; for (let q = 0; q < 3; q++) spawnAnimal(k, nx + rnd() - 0.5, ny + rnd() - 0.5, { lead: L, ox: (rnd() - 0.5) * 3, oy: (rnd() - 0.5) * 3, pal: L.pal }); }
+        else spawnAnimal(k, nx, ny, { baby: 1500, age: 0 });
+      }
+    }
+  }
+  function updateAnimals() {
+    fc++;
+    predators.length = 0;
+    for (const a of animals) if (a.S.eats && !a.dead) predators.push(a);
+    for (const a of animals) {
+      if (a.dead) continue;
+      if (a.S.kind === 'sky') updateFlyer(a); else updateWalker(a);
+    }
+    for (let k = animals.length - 1; k >= 0; k--) if (animals[k].dead) animals.splice(k, 1);
+    if (fc % 10 === 0) animals.sort((p, q) => p.y - q.y);
+    if (fc % 60 === 0) manageAnimals();
+  }
+  function emoteOf(a) {
+    if (a.emoT > 0 && a.emo) return a.emo;
+    switch (a.state) {
+      case 'flee': return 'alarm';
+      case 'chase': case 'dive': return 'angry';
+      case 'sleep': return 'zzz';
+      case 'rest': return a.S.eats ? 'zzz' : null;
+      case 'drink': return 'drop';
+      case 'eat': return 'leaf';
+      case 'feast': return 'meat';
+      case 'mate': return 'heart';
+    }
+    return null;
+  }
+  function drawAnimals(ox, oy, z, pass) {
+    const cw = canvas.width, ch = canvas.height, showEmo = zoom > fitZ * 1.25;
+    for (const a of animals) {
+      const S = a.S;
+      if (S.key === 'firefly') continue;
+      if ((pass === 'sky') !== (S.kind === 'sky')) continue;
+      const bx = a.x * SUB, by = a.y * SUB, sx0 = ox + bx * z, sy0 = oy + by * z;
+      if (sx0 < -100 || sy0 < -100 || sx0 > cw + 100 || sy0 > ch + 100 + (S.alt || 0) * z) continue;
+      const moving = S.kind === 'sky' || Math.abs(a.vx) + Math.abs(a.vy) > 0.001 || a.state === 'tossed';
+      let f = moving ? Math.floor(a.t) % 2 : 0;
+      if (S.key === 'eagle') f = a.state === 'dive' ? 1 : Math.floor(a.t) % 4 === 0 ? 1 : 0;
+      const scale = a.baby > 0 ? 0.6 : 1, w = S.w * scale, h = S.h * scale;
+      const dx = bx - w / 2;
+      let dy = by - h + 1;
+      if (S.hop && moving) dy -= Math.abs(Math.sin(a.t * 1.6)) * 2;
+      if ((a.state === 'eat' || a.state === 'drink' || a.state === 'feast') && (fc >> 3) % 2) dy += 1;
+      if (S.kind === 'sea') {
+        const i = tileAt(a.x, a.y);
+        if (i >= 0 && cover[i] === C_ICE) continue;
+        if (a.jump) { dy -= Math.sin(a.jump * Math.PI) * 10; ctx.globalAlpha = 1; }
+        else ctx.globalAlpha = S.key === 'whale' ? 0.82 : 0.66;
+      } else if (S.kind === 'sky') {
+        const alt = a.alt !== undefined ? a.alt : S.alt;
+        ctx.globalAlpha = 0.2; ctx.fillStyle = '#000';
+        ctx.fillRect(Math.round(ox + (dx + 2) * z), Math.round(oy + (by + 2) * z), Math.max(1, Math.round((w - 1) * z)), Math.max(1, Math.round(z * 1.5)));
+        dy -= alt; ctx.globalAlpha = 1;
+      } else {
+        ctx.globalAlpha = 0.25; ctx.fillStyle = '#000';
+        ctx.fillRect(Math.round(ox + (dx + 1) * z), Math.round(oy + by * z), Math.max(1, Math.round((w - 2) * z)), Math.max(1, Math.round(z * 1.5)));
+        ctx.globalAlpha = 1;
+      }
+      if (a.z) dy -= a.z;
+      const flip = a.state === 'tossed' ? (Math.floor(a.t) % 2) : (a.dir < 0 ? 1 : 0);
+      const lying = S.lie && (a.state === 'sleep' || a.state === 'rest' || a.state === 'lurk');
+      const img = lying ? S.lie[a.pal][flip] : S.imgs[a.pal][f][flip];
+      ctx.drawImage(img, Math.round(ox + dx * z), Math.round(oy + dy * z), Math.max(1, Math.round(w * z)), Math.max(1, Math.round(h * z)));
+      ctx.globalAlpha = 1;
+      if (a === selected) {
+        ctx.strokeStyle = '#ffe45c'; ctx.lineWidth = Math.max(1, z * 0.6);
+        ctx.beginPath(); ctx.ellipse(ox + bx * z, oy + (by + 0.5) * z, (w * 0.6 + 1) * z, (2.5) * z, 0, 0, Math.PI * 2); ctx.stroke();
+      }
+      if (showEmo || a === selected) {
+        const e = emoteOf(a);
+        if (e) {
+          const img2 = EMO[e], ew = img2.width, eh = img2.height;
+          const ex = bx - ew / 2, ey = dy - eh - 2 - ((fc >> 4) % 2);
+          ctx.globalAlpha = 0.55; ctx.fillStyle = '#000';
+          ctx.fillRect(Math.round(ox + (ex - 1) * z), Math.round(oy + (ey - 1) * z), Math.round((ew + 2) * z), Math.round((eh + 2) * z));
+          ctx.globalAlpha = 1;
+          ctx.drawImage(img2, Math.round(ox + ex * z), Math.round(oy + ey * z), Math.round(ew * z), Math.round(eh * z));
+        }
+      }
+    }
+    ctx.globalAlpha = 1;
+  }
+  function drawFireflies(ox, oy, z) {
+    for (const a of animals) {
+      if (a.S.key !== 'firefly') continue;
+      const b = 0.5 + 0.5 * Math.sin(a.t * 1.3 + a.phase);
+      if (b < 0.15) continue;
+      const sx = ox + a.x * SUB * z, sy = oy + (a.y * SUB - 4) * z;
+      ctx.globalAlpha = b * Math.min(1, dark * 1.8);
+      ctx.drawImage(glowG, sx - 4 * z, sy - 4 * z, 8 * z, 8 * z);
+      ctx.fillStyle = '#f4ffb0';
+      ctx.fillRect(sx - z * 0.5, sy - z * 0.5, Math.max(1, z), Math.max(1, z));
+    }
+    ctx.globalAlpha = 1;
+  }
+  const STATE_TXT = {
+    wander: 'Гуляє', eat: 'Їсть', toFood: 'Шукає їжу', drink: 'П\'є воду', toWater: 'Йде до води', sleep: 'Спить',
+    rest: 'Відпочиває', flee: 'Тікає!', stalk: 'Підкрадається до', chase: 'Женеться за', feast: 'Їсть здобич', lurk: 'Чатує в засідці',
+    tossed: 'Летить у смерчі!', mate: 'Залицяється', follow: 'Йде за мамою', dive: 'Пікірує на', climb: 'Набирає висоту', circle: 'Кружляє'
+  };
+  const inspEl = document.getElementById('insp');
+  function bar(v, col) { return `<span class="bar"><i style="width:${Math.round(clamp(v, 0, 1) * 100)}%;background:${col}"></i></span>`; }
+  function pickAnimal(p) {
+    const t = toTile(p);
+    let best = null, bd = 2.5;
+    for (const a of animals) {
+      if (a.dead || a.S.key === 'firefly') continue;
+      const ay = a.S.kind === 'sky' ? a.y - (a.alt !== undefined ? a.alt : a.S.alt) / SUB : a.y - a.S.h / SUB / 2;
+      const d = Math.hypot(a.x - t.x, ay - t.y);
+      if (d < bd) { bd = d; best = a; }
+    }
+    selected = best;
+    if (best) { if (best.S.voice && cool('inspv', 600)) SFX[best.S.voice](0.7); else SFX.click(); }
+    updateInspect();
+  }
+  function updateInspect() {
+    const a = selected;
+    if (!a) { inspEl.style.display = 'none'; return; }
+    inspEl.style.display = 'block';
+    const S = a.S;
+    if (a.dead) {
+      inspEl.innerHTML = `<b>${S.name}</b><br>${DEATH[a.how] || 'Загинув'}`;
+      if (!a.goneT) a.goneT = fc;
+      if (fc - a.goneT > 240) selected = null;
+      return;
+    }
+    let st = STATE_TXT[a.state] || a.state;
+    if (a.state === 'toFood' && S.eats && a.prowl) st = 'Вистежує здобич';
+    if ((a.state === 'stalk' || a.state === 'chase' || a.state === 'dive') && a.target) st += ': ' + a.target.S.name.toLowerCase();
+    const days = Math.floor(a.age / 9000);
+    let html = `<b>${S.name}${a.baby > 0 ? ' (малюк)' : ''}</b><br>${st}`;
+    if (S.kind === 'land') {
+      html += `<br>Ситість${bar(1 - a.hunger, '#7ad05a')}`;
+      if (S.thirsty) html += `<br>Вода${bar(1 - a.thirst, '#5ab8ff')}`;
+      if (S.eats) html += `<br>Сили${bar(a.stam / S.stam, '#ffd23c')}`;
+      html += `<br>Вік: ${days} дн.`;
+      if (S.eats) html += `<br>Полює на: ${S.eats.map(e => SPECIES[e].name.toLowerCase()).join(', ')}`;
+      else if (S.preyOf) html += `<br>Боїться: ${[...S.preyOf].map(e => SPECIES[e].name.toLowerCase()).join(', ')}`;
+    }
+    inspEl.innerHTML = html;
+  }
+  function animalVoices() {
+    if (!canPlay() || --voiceCd > 0) return;
+    for (let tries = 0; tries < 8; tries++) {
+      const a = animals[(rnd() * animals.length) | 0];
+      if (!a) return;
+      const S = a.S;
+      if (!S.voice || a.dead || a.state === 'sleep' || a.state === 'rest') continue;
+      if (S.key === 'wolf' && dark < 0.3) continue;
+      if (S.key === 'frog' && dark < 0.15) continue;
+      if ((S.key === 'bird' || S.key === 'gull' || S.key === 'eagle') && dark > 0.3) continue;
+      if (!visibleT(a.x, a.y)) continue;
+      SFX[S.voice](clamp(zoom / fitZ / 2.5, 0.35, 1));
+      voiceCd = 50 + rnd() * 90;
+      return;
+    }
+    voiceCd = 20;
+  }
+
+  function ambientSfx() {
+    if (!canPlay() || paused) return;
+    if (visFire > 0 && rnd() < Math.min(0.5, visFire / 25)) SFX.crackle(0.04 + rnd() * 0.08);
+    if (visLava > 0 && rnd() < Math.min(0.08, visLava / 150)) SFX.blup();
+    if (dark > 0.35 && rnd() < 0.025) SFX.cricket();
+    if (dark < 0.15 && rnd() < 0.004) SFX.tweet(0.5);
+  }
+  function audioTick(ts) {
+    if (!AC) return;
+    let visTor = 0;
+    for (const t of tornados) if (visibleT(t.x, t.y)) visTor++;
+    const on = paused ? 0 : 1;
+    setLoop(loops.ocean, on * (0.05 + 0.035 * Math.sin(ts / 2600)));
+    setLoop(loops.wind, on * (0.015 + 0.06 * windS * (1 - dark * 0.5)), 350 + 450 * windS);
+    setLoop(loops.rain, on * Math.min(0.32, rainCount / 220));
+    setLoop(loops.fire, on * Math.min(0.4, visFire / 35));
+    setLoop(loops.tornado, on * Math.min(0.45, visTor * 0.3));
+    setLoop(loops.lava, on * Math.min(0.35, visLava / 30));
+  }
+
+  // ================= clouds =================
+  function makeCloud(w, h, storm) {
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    const s = document.createElement('canvas'); s.width = w; s.height = h;
+    const g = c.getContext('2d'), gs = s.getContext('2d');
+    const im = g.createImageData(w, h), ims = gs.createImageData(w, h);
+    const blobs = [], n = 4 + ((rnd() * 4) | 0);
+    for (let k = 0; k < n; k++) blobs.push({ x: w * (0.18 + 0.64 * rnd()), y: h * (0.45 + 0.2 * rnd()), r: h * (0.3 + 0.22 * rnd()) });
+    const inside = (x, y) => blobs.some(b => (x - b.x) * (x - b.x) + (y - b.y) * (y - b.y) * 1.2 < b.r * b.r);
+    const top = storm ? [150, 156, 170] : [252, 253, 255], bot = storm ? [88, 94, 110] : [204, 212, 226], hi = storm ? [182, 188, 200] : [255, 255, 255];
+    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+      if (!inside(x + 0.5, y + 0.5)) continue;
+      const t = y / h, q = (y * w + x) * 4;
+      let cc = [lerp(top[0], bot[0], t), lerp(top[1], bot[1], t), lerp(top[2], bot[2], t)];
+      if (!inside(x + 0.5, y - 0.5)) cc = hi;
+      else if (!inside(x + 0.5, y + 1.5)) cc = [cc[0] * 0.88, cc[1] * 0.88, cc[2] * 0.9];
+      im.data[q] = cc[0]; im.data[q + 1] = cc[1]; im.data[q + 2] = cc[2]; im.data[q + 3] = 255;
+      ims.data[q + 3] = 255;
+    }
+    g.putImageData(im, 0, 0); gs.putImageData(ims, 0, 0);
+    return { c, s };
+  }
+  function spawnAmbientCloud(initial) {
+    const w = ((22 + rnd() * 22) * K) | 0, h = ((10 + rnd() * 8) * K) | 0;
+    let x, y;
+    if (initial) { x = rnd() * BW; y = rnd() * BH; }
+    else if (Math.abs(wx) >= Math.abs(wy)) { x = wx > 0 ? -w - 10 : BW + 10; y = rnd() * BH; }
+    else { y = wy > 0 ? -h - 20 : BH + 10; x = rnd() * BW; }
+    clouds.push({ x, y, w, h, sp: makeCloud(w, h, false), storm: false, spd: 0.1 + rnd() * 0.1, life: Infinity, age: 0, alpha: 0.55 });
+  }
+  function spawnStorm(tx, ty) {
+    if (clouds.filter(c => c.storm).length >= 6) return;
+    const w = ((34 + rnd() * 14) * K) | 0, h = ((15 + rnd() * 6) * K) | 0;
+    clouds.push({ x: tx * SUB - w / 2, y: ty * SUB - h / 2 - 6 * K, w, h, sp: makeCloud(w, h, true), storm: true, spd: 0.06, life: 1500, age: 0, alpha: 0 });
+  }
+  function stormArea(cl) { return { cx: (cl.x + cl.w / 2) / SUB, cy: (cl.y + cl.h / 2 + 6 * K) / SUB, rx: cl.w * 0.42 / SUB, ry: cl.h * 0.6 / SUB }; }
+  function updateClouds() {
+    let ambient = 0;
+    for (let k = clouds.length - 1; k >= 0; k--) {
+      const cl = clouds[k];
+      cl.x += wx * cl.spd * windS * 1.4 * K; cl.y += wy * cl.spd * windS * 0.9 * K; cl.age++;
+      if (cl.storm) {
+        cl.alpha = 0.9 * Math.min(1, cl.age / 60, (cl.life - cl.age) / 60);
+        if (cl.age >= cl.life) { clouds.splice(k, 1); continue; }
+        if (cl.alpha > 0.4) {
+          const a = stormArea(cl);
+          for (let n = 0; n < 3; n++) {
+            const ang = rnd() * Math.PI * 2, rr = Math.sqrt(rnd());
+            const tx = a.cx + Math.cos(ang) * a.rx * rr, ty = a.cy + Math.sin(ang) * a.ry * rr;
+            const ix = tx | 0, iy = ty | 0;
+            if (ix < 0 || iy < 0 || ix >= W || iy >= H) continue;
+            isCold(iy * W + ix) ? snowAt(tx * SUB, ty * SUB) : rainAt(tx * SUB, ty * SUB);
+          }
+          if (rnd() < 0.003) {
+            const ang = rnd() * Math.PI * 2, rr = Math.sqrt(rnd());
+            strike(a.cx + Math.cos(ang) * a.rx * rr, a.cy + Math.sin(ang) * a.ry * rr, true);
+          }
+        }
+      } else {
+        ambient++;
+        if (cl.x < -80 || cl.y < -80 || cl.x > BW + 80 || cl.y > BH + 80) { clouds.splice(k, 1); ambient--; }
+      }
+    }
+    if (ambient < 4 && rnd() < 0.01) spawnAmbientCloud(false);
+  }
+  function weatherTick() {
+    for (const cl of clouds) {
+      if (!cl.storm || cl.alpha < 0.4) continue;
+      const a = stormArea(cl);
+      for (let ty = Math.floor(a.cy - a.ry); ty <= Math.ceil(a.cy + a.ry); ty++) {
+        for (let tx = Math.floor(a.cx - a.rx); tx <= Math.ceil(a.cx + a.rx); tx++) {
+          if (tx < 0 || ty < 0 || tx >= W || ty >= H) continue;
+          const ex = (tx - a.cx) / a.rx, ey = (ty - a.cy) / a.ry;
+          if (ex * ex + ey * ey > 1) continue;
+          const i = ty * W + tx;
+          if (isCold(i)) {
+            if (hgt[i] < SEA) { if (cover[i] !== C_ICE && rnd() < 0.03) { cover[i] = C_ICE; timer[i] = 400; } }
+            else { snow[i] = Math.min(900, snow[i] + 12); if (cover[i] === C_FIRE) { cover[i] = C_BURNT; timer[i] = 60; } }
+          } else {
+            if (hgt[i] >= SEA) wet[i] = 100;
+            if (cover[i] === C_FIRE) { cover[i] = C_BURNT; timer[i] = 60; }
+            if (cover[i] === C_LAVA) { timer[i] -= 3; if (rnd() < 0.05) steamAt(tx * SUB + 2, ty * SUB); }
+            if (snow[i] > 0) snow[i] = Math.max(0, snow[i] - 6);
+          }
+        }
+      }
+    }
+    if (clouds.filter(c => c.storm).length < 2 && rnd() < 0.003) spawnStorm(rnd() * W, rnd() * H);
+  }
+
+  // ================= events: lightning, meteor, tornado =================
+  function strike(tx, ty, natural) {
+    const bx = tx * SUB + 2, by = ty * SUB + 2;
+    const pts = [], sx = bx + (rnd() - 0.5) * 20 * K, sy = by - 110 * K, segs = 12;
+    for (let s = 0; s <= segs; s++) {
+      const t = s / segs;
+      pts.push([lerp(sx, bx, t) + (s > 0 && s < segs ? (rnd() - 0.5) * 9 * K : 0), lerp(sy, by, t)]);
+    }
+    const br = [pts[5]];
+    let bxx = pts[5][0], byy = pts[5][1];
+    for (let s = 0; s < 4; s++) { bxx += (3 + rnd() * 4) * K; byy += (5 + rnd() * 4) * K; br.push([bxx, byy]); }
+    bolts.push({ pts, br, life: 10 });
+    flash = Math.max(flash, natural ? 0.3 : 0.45);
+    SFX.thunder(natural ? 0.2 + rnd() * 0.6 : 0);
+    for (const a of animals) if (!a.dead && a.S.kind !== 'sky' && Math.hypot(a.x - tx, a.y - ty) < 1.1) kill(a, 'burn');
+    burst('spark', bx, by, 12, 1.2, ['#fffbe0', '#ffe45c', '#bcd4ff'], 14);
+    const cx = Math.floor(tx), cy = Math.floor(ty);
+    for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
+      const x = cx + dx, y = cy + dy;
+      if (x < 0 || y < 0 || x >= W || y >= H) continue;
+      const i = y * W + x;
+      if (hgt[i] < SEA) continue;
+      snow[i] = 0;
+      if (wet[i] === 0 && isVeg(hgt[i])) {
+        if (cover[i] === C_TREE) { cover[i] = C_FIRE; timer[i] = 35; }
+        else if (cover[i] === C_NONE && dx === 0 && dy === 0) { cover[i] = C_FIRE; timer[i] = 14; }
+      }
+    }
+    dirty = true;
+  }
+  function launchMeteor(tx, ty) {
+    SFX.whoosh();
+    const ex = tx * SUB, ey = ty * SUB;
+    meteors.push({ sx: ex + 70 * K, sy: ey - 130 * K, ex, ey, x: ex + 70 * K, y: ey - 130 * K, t: 0, tx: Math.floor(tx), ty: Math.floor(ty) });
+  }
+  function impact(cx, cy) {
+    const ci = clamp(cy, 0, H - 1) * W + clamp(cx, 0, W - 1);
+    const inWater = hgt[ci] < SEA;
+    for (let dy = -7; dy <= 7; dy++) for (let dx = -7; dx <= 7; dx++) {
+      const x = cx + dx, y = cy + dy;
+      if (x < 0 || y < 0 || x >= W || y >= H) continue;
+      const i = y * W + x, d = Math.hypot(dx, dy);
+      if (d < 3.6) {
+        setH(i, hgt[i] - 0.13 * (1 - d / 3.6) - 0.02);
+        snow[i] = 0; wet[i] = 0;
+        if (hgt[i] >= SEA) { cover[i] = d < 1.3 ? C_LAVA : C_BURNT; timer[i] = d < 1.3 ? 30 : 200; }
+        else cover[i] = C_NONE;
+      } else if (d < 5) {
+        setH(i, hgt[i] + 0.035 * (1 - (d - 3.6) / 1.4));
+        snow[i] = 0;
+        if (cover[i] === C_TREE && rnd() < 0.6) { cover[i] = C_FIRE; timer[i] = 30; }
+      } else if (d < 7.5 && cover[i] === C_TREE && rnd() < 0.3) { cover[i] = C_FIRE; timer[i] = 30; }
+    }
+    const bx = cx * SUB + SUB / 2, by = cy * SUB + SUB / 2;
+    shake = 14 * dpr; flash = Math.max(flash, 0.4);
+    SFX.boom(); if (inWater) SFX.splash(0.45);
+    for (const a of animals) {
+      if (a.dead) continue;
+      const dx = a.x - (cx + 0.5), dy = a.y - (cy + 0.5), d = Math.hypot(dx, dy) || 0.01;
+      if (a.S.kind === 'sky') { if (d < 3 && a.S.key !== 'firefly') kill(a, 'burn'); continue; }
+      if (d < 3.8) kill(a, 'burn');
+      else if (d < 8 && a.S.kind !== 'sea') { a.state = 'tossed'; a.z = 1; a.vz = 1.2 + rnd(); a.vx = dx / d * 0.15; a.vy = dy / d * 0.15; }
+    }
+    waves.push({ x: bx, y: by, r: 2, life: 28, max: 28 });
+    if (inWater) {
+      burst('debris', bx, by, 70, 2.2, ['#dff2ff', '#9fd4ff', '#ffffff'], 40);
+      for (let k = 0; k < 20; k++) steamAt(bx + (rnd() - 0.5) * 16, by + (rnd() - 0.5) * 16);
+    } else {
+      burst('debris', bx, by, 70, 2.2, ['#5a4034', '#ff8a1e', '#8a7a70', '#ffd24a', '#3a2a26'], 45);
+      for (let k = 0; k < 25; k++) smokeAt(bx + (rnd() - 0.5) * 18, by + (rnd() - 0.5) * 18);
+    }
+    dirty = true;
+  }
+  function spawnTornado(tx, ty) {
+    if (tornados.length >= 4) return;
+    tornados.push({ x: tx, y: ty, vx: wx * 0.03, vy: wy * 0.03, life: 900, max: 900, ph: 0 });
+  }
+  const LEAVES = ['#3e9a3e', '#7cd35a', '#7a4e2a', '#22662e'];
+  function updateEntities() {
+    for (let k = meteors.length - 1; k >= 0; k--) {
+      const m = meteors[k];
+      m.t += 0.028;
+      const e = Math.min(1, m.t * m.t);
+      m.x = lerp(m.sx, m.ex, e); m.y = lerp(m.sy, m.ey, e);
+      for (let n = 0; n < 3; n++) addP('ember', m.x + (rnd() - 0.5) * 3, m.y + (rnd() - 0.5) * 3, (rnd() - 0.5) * 0.3 + 0.3, -0.3 - rnd() * 0.3, 14 + rnd() * 10);
+      if (rnd() < 0.5) smokeAt(m.x, m.y);
+      if (m.t >= 1) { impact(m.tx, m.ty); meteors.splice(k, 1); }
+    }
+    for (let k = tornados.length - 1; k >= 0; k--) {
+      const t = tornados[k];
+      t.ph += 0.25;
+      t.vx += (rnd() - 0.5) * 0.01 + wx * 0.0006; t.vy += (rnd() - 0.5) * 0.01 + wy * 0.0006;
+      const sp = Math.hypot(t.vx, t.vy);
+      if (sp > 0.06) { t.vx *= 0.06 / sp; t.vy *= 0.06 / sp; }
+      t.x += t.vx; t.y += t.vy;
+      if (t.x < 2 || t.x > W - 2) t.vx *= -1;
+      if (t.y < 2 || t.y > H - 2) t.vy *= -1;
+      t.x = clamp(t.x, 1, W - 2); t.y = clamp(t.y, 1, H - 2);
+      const bx = t.x * SUB, by = t.y * SUB;
+      for (let n = 0; n < 2; n++) {
+        const a = rnd() * Math.PI * 2;
+        addP('dust', bx + Math.cos(a) * 3, by + Math.sin(a) * 2, -Math.sin(a) * 0.8, Math.cos(a) * 0.5 - 0.3, 20 + rnd() * 10);
+      }
+      if (frame !== t.lastFrame && (t.age = (t.age || 0) + 1) % 3 === 0) {
+        for (let dy = -2; dy <= 2; dy++) for (let dx = -2; dx <= 2; dx++) {
+          if (dx * dx + dy * dy > 3) continue;
+          const x = Math.floor(t.x) + dx, y = Math.floor(t.y) + dy;
+          if (x < 0 || y < 0 || x >= W || y >= H) continue;
+          const i = y * W + x;
+          if (cover[i] === C_TREE && rnd() < 0.25) {
+            cover[i] = C_NONE;
+            for (let n = 0; n < 4; n++) { const a = rnd() * Math.PI * 2; addP('leaf', x * SUB + 2, y * SUB + 2, Math.cos(a) * 1.2, Math.sin(a) * 0.8, 40 + rnd() * 20, { c: LEAVES[(rnd() * 4) | 0], drag: 0.96 }); }
+          } else if (cover[i] === C_FIRE && rnd() < 0.15) {
+            const j = clamp(y + ((rnd() * 5) | 0) - 2, 0, H - 1) * W + clamp(x + ((rnd() * 5) | 0) - 2, 0, W - 1);
+            if (cover[j] === C_TREE) { cover[j] = C_FIRE; timer[j] = 30; }
+          }
+          if (snow[i] > 0) snow[i] = Math.max(0, snow[i] - 40);
+          if (hgt[i] < SEA && rnd() < 0.1) addP('debris', x * SUB + 2, y * SUB + 2, (rnd() - 0.5) * 1.5, -rnd() * 1.5, 20, { c: '#dff2ff', drag: 0.94 });
+        }
+        dirty = true;
+      }
+      t.lastFrame = frame;
+      if (--t.life <= 0) tornados.splice(k, 1);
+    }
+    for (let k = bolts.length - 1; k >= 0; k--) if (--bolts[k].life <= 0) bolts.splice(k, 1);
+    for (let k = waves.length - 1; k >= 0; k--) { waves[k].r += 1.3 * K; if (--waves[k].life <= 0) waves.splice(k, 1); }
+  }
+
+  // ================= simulation =================
+  function igniteNeighbor(j, dx, dy) {
+    if (lit[j] || wet[j] > 0 || snow[j] > 40) return;
+    const h = hgt[j], c = cover[j];
+    if (!isVeg(h)) return;
+    const b = biome[j];
+    const bf = (b === B_DESERT || b === B_SAVANNA) ? 1.5 : b === B_JUNGLE ? 0.8 : b === B_SWAMP ? 0.4 : b === B_TUNDRA ? 0.6 : 1;
+    const wf = Math.max(0.15, 1 + 1.1 * (dx * wx + dy * wy) * windS);
+    if (c === C_TREE && rnd() < 0.14 * bf * wf) { cover[j] = C_FIRE; timer[j] = 28 + ((rnd() * 16) | 0); lit[j] = 1; }
+    else if (c === C_NONE && rnd() < 0.035 * bf * wf) { cover[j] = C_FIRE; timer[j] = 10 + ((rnd() * 8) | 0); lit[j] = 1; }
+  }
+  function lavaTick(x, y, i) {
+    snow[i] = 0;
+    let best = -1, bh = hgt[i] + 0.006;
+    const nb = [x > 0 ? i - 1 : -1, x < W - 1 ? i + 1 : -1, y > 0 ? i - W : -1, y < H - 1 ? i + W : -1];
+    for (const j of nb) {
+      if (j < 0) continue;
+      if (cover[j] === C_TREE && !lit[j] && rnd() < 0.3) { cover[j] = C_FIRE; timer[j] = 30; lit[j] = 1; }
+      if (snow[j] > 0) { snow[j] = 0; if (rnd() < 0.3) steamAt((j % W) * SUB + 2, ((j / W) | 0) * SUB); }
+      if (cover[j] !== C_LAVA && hgt[j] < bh) { bh = hgt[j]; best = j; }
+    }
+    timer[i]--;
+    if (best >= 0 && timer[i] > 10 && rnd() < 0.3) {
+      const bx = (best % W) * SUB + 2, by = ((best / W) | 0) * SUB;
+      if (hgt[best] < SEA) {
+        setH(best, SEA + 0.012); cover[best] = C_BASALT; timer[best] = 900; lit[best] = 1; timer[i] -= 6;
+        for (let n = 0; n < 4; n++) steamAt(bx, by);
+      } else { cover[best] = C_LAVA; timer[best] = timer[i] - 8; lit[best] = 1; timer[i] -= 4; }
+    }
+    if (wet[i] > 0) timer[i] -= 3;
+    if (timer[i] <= 0) { cover[i] = C_BASALT; timer[i] = 900; setH(i, hgt[i] + 0.008); }
+    if (rnd() < 0.02) emberAt(x * SUB + 2, y * SUB + 1);
+  }
+  function simulate() {
+    lit.fill(0);
+    for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+      const i = y * W + x, h = hgt[i], c = cover[i], b = biome[i];
+      if (wet[i] > 0) wet[i]--;
+      if (grazed[i] > 0) grazed[i] = Math.max(0, grazed[i] - (wet[i] ? 3 : 1));
+      if (lit[i]) continue;
+      if (snow[i] > 0) {
+        if (h < SEA) snow[i] = 0;
+        else {
+          const rate = b === B_TUNDRA ? (snow[i] > 300 ? 1 : 0) : b === B_DESERT ? 5 : (b === B_SAVANNA || b === B_JUNGLE) ? 3 : 1;
+          if (rate) { snow[i] = Math.max(0, snow[i] - rate); if (snow[i] === 0) wet[i] = Math.max(wet[i], 40); }
+        }
+      }
+      if (h < SEA) {
+        if (c === C_ICE) { if (b !== B_TUNDRA || rnd() < 0.25) timer[i]--; if (timer[i] <= 0) cover[i] = C_NONE; }
+        else if (c !== C_NONE) cover[i] = C_NONE;
+        continue;
+      }
+      switch (c) {
+        case C_ICE: cover[i] = C_NONE; break;
+        case C_FIRE:
+          snow[i] = 0;
+          if (--timer[i] <= 0) { cover[i] = C_BURNT; timer[i] = 150 + ((rnd() * 200) | 0); }
+          else {
+            if (x > 0) igniteNeighbor(i - 1, -1, 0);
+            if (x < W - 1) igniteNeighbor(i + 1, 1, 0);
+            if (y > 0) igniteNeighbor(i - W, 0, -1);
+            if (y < H - 1) igniteNeighbor(i + W, 0, 1);
+            if (rnd() < 0.05) smokeAt(x * SUB + 2, y * SUB);
+            if (rnd() < 0.04) emberAt(x * SUB + 2, y * SUB);
+          }
+          break;
+        case C_BURNT:
+          if (timer[i] > 0) timer[i]--;
+          else if (rnd() < (wet[i] ? 0.08 : 0.015)) cover[i] = C_NONE;
+          break;
+        case C_LAVA: lavaTick(x, y, i); break;
+        case C_BASALT:
+          if (timer[i] > 0) timer[i]--;
+          else if (rnd() < 0.004) cover[i] = C_NONE;
+          break;
+        case C_NONE:
+          if (isVeg(h) && rnd() < GROW[b] * (wet[i] ? 2 : 1)) {
+            if ((x > 0 && cover[i - 1] === C_TREE) || (x < W - 1 && cover[i + 1] === C_TREE) ||
+                (y > 0 && cover[i - W] === C_TREE) || (y < H - 1 && cover[i + W] === C_TREE)) cover[i] = C_TREE;
+          }
+          break;
+      }
+    }
+  }
+
+  // ================= camera / canvas =================
+  function sizeCanvas() {
+    const w = wrap.clientWidth, h = wrap.clientHeight;
+    dpr = Math.min(window.devicePixelRatio || 1, 3);
+    canvas.width = Math.round(w * dpr); canvas.height = Math.round(h * dpr);
+    canvas.style.width = w + 'px'; canvas.style.height = h + 'px';
+  }
+  function fitCamera() {
+    const cw = canvas.width, ch = canvas.height;
+    zoom = Math.max(cw / BW, ch / BH);
+    minZoom = Math.min(cw / BW, ch / BH) * 0.9;
+    maxZoom = Math.max(zoom * 10, 24);
+    fitZ = zoom;
+    camX = (cw - BW * zoom) / 2; camY = (ch - BH * zoom) / 2;
+  }
+  function clampCam() {
+    const cw = canvas.width, ch = canvas.height, mw = BW * zoom, mh = BH * zoom;
+    camX = clamp(camX, Math.min(cw * 0.5 - mw, (cw - mw) / 2), Math.max(cw * 0.5, (cw - mw) / 2));
+    camY = clamp(camY, Math.min(ch * 0.5 - mh, (ch - mh) / 2), Math.max(ch * 0.5, (ch - mh) / 2));
+  }
+  function zoomAt(px, py, nz) {
+    nz = clamp(nz, minZoom, maxZoom);
+    const wx0 = (px - camX) / zoom, wy0 = (py - camY) / zoom;
+    zoom = nz; camX = px - wx0 * zoom; camY = py - wy0 * zoom; clampCam();
+  }
+
+  const glowSpr = (() => {
+    const c = document.createElement('canvas'); c.width = c.height = 32;
+    const g = c.getContext('2d'), gr = g.createRadialGradient(16, 16, 0, 16, 16, 16);
+    gr.addColorStop(0, 'rgba(255,190,110,1)'); gr.addColorStop(0.35, 'rgba(255,110,30,0.45)'); gr.addColorStop(1, 'rgba(255,60,0,0)');
+    g.fillStyle = gr; g.fillRect(0, 0, 32, 32);
+    return c;
+  })();
+
+  let cursor = null;
+  function render() {
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.imageSmoothingEnabled = false;
+    ctx.fillStyle = 'rgb(18,44,102)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    const shx = shake ? (rnd() - 0.5) * shake : 0, shy = shake ? (rnd() - 0.5) * shake : 0;
+    shake *= 0.86; if (shake < 0.3) shake = 0;
+    const ox = Math.round(camX + shx), oy = Math.round(camY + shy), z = zoom;
+    ctx.drawImage(buf, ox, oy, Math.round(BW * z), Math.round(BH * z));
+
+    // cloud shadows
+    for (const cl of clouds) {
+      ctx.globalAlpha = cl.alpha * 0.28;
+      ctx.drawImage(cl.sp.s, ox + (cl.x + 10 * K) * z, oy + (cl.y + 16 * K) * z, cl.w * z, cl.h * z);
+    }
+    ctx.globalAlpha = 1;
+
+    // shock waves
+    for (const w of waves) {
+      const a = w.life / w.max;
+      ctx.strokeStyle = `rgba(255,236,200,${0.8 * a})`;
+      ctx.lineWidth = Math.max(1, z * 1.2);
+      ctx.beginPath(); ctx.arc(ox + w.x * z, oy + w.y * z, w.r * z, 0, Math.PI * 2); ctx.stroke();
+    }
+
+    drawAnimals(ox, oy, z, 'ground');
+
+    // tornados
+    for (const t of tornados) {
+      const a = Math.min(1, t.life / 60, (t.max - t.life) / 30);
+      const bx = t.x * SUB, by = t.y * SUB;
+      ctx.globalAlpha = 0.28 * a; ctx.fillStyle = '#000';
+      ctx.fillRect(ox + (bx - 4 * K) * z, oy + (by - K) * z, 8 * K * z, 3 * K * z);
+      for (let k = 0; k < 14; k++) {
+        const w = (2 + k * 0.85) * K, sway = Math.sin(t.ph + k * 0.45) * k * 0.35 * K, yy = by - k * 2.2 * K;
+        ctx.globalAlpha = 0.85 * a;
+        ctx.fillStyle = k % 2 ? '#c6ccd4' : '#e9ecf0';
+        ctx.fillRect(Math.round(ox + (bx - w / 2 + sway) * z), Math.round(oy + (yy - 2.2 * K) * z), Math.ceil(w * z), Math.ceil(2.3 * K * z));
+      }
+    }
+    ctx.globalAlpha = 1;
+
+    // particles
+    for (const p of particles) {
+      const a = p.life / p.max, sx = ox + p.x * z, sy = oy + p.y * z;
+      switch (p.kind) {
+        case 'rain': ctx.globalAlpha = 0.85; ctx.fillStyle = '#9fd4ff'; ctx.fillRect(sx, sy, Math.max(1, z * 0.6), z * 2.6); break;
+        case 'splash': ctx.globalAlpha = a; ctx.fillStyle = '#d8eeff'; ctx.fillRect(sx - z, sy, Math.max(1, z * 0.7), Math.max(1, z * 0.7)); ctx.fillRect(sx + z, sy, Math.max(1, z * 0.7), Math.max(1, z * 0.7)); break;
+        case 'snow': ctx.globalAlpha = Math.min(1, a * 1.5); ctx.fillStyle = '#ffffff'; ctx.fillRect(sx, sy, Math.max(1, z * 0.9), Math.max(1, z * 0.9)); break;
+        case 'smoke': { ctx.globalAlpha = 0.42 * a; ctx.fillStyle = '#666a6e'; const s = z * (1.5 + (1 - a) * 2.5); ctx.fillRect(sx, sy, s, s); break; }
+        case 'steam': { ctx.globalAlpha = 0.5 * a; ctx.fillStyle = '#eef3f7'; const s = z * (1.2 + (1 - a) * 2.5); ctx.fillRect(sx, sy, s, s); break; }
+        case 'ember': ctx.globalAlpha = a; ctx.fillStyle = a > 0.5 ? '#ffd24a' : '#ff6a1e'; ctx.fillRect(sx, sy, Math.max(1, z * 0.8), Math.max(1, z * 0.8)); break;
+        case 'spark': ctx.globalAlpha = a; ctx.fillStyle = p.c; ctx.fillRect(sx, sy, Math.max(1, z * 0.8), Math.max(1, z * 0.8)); break;
+        case 'dust': ctx.globalAlpha = 0.5 * a; ctx.fillStyle = '#c2ad86'; ctx.fillRect(sx, sy, z, z); break;
+        default: ctx.globalAlpha = Math.min(1, a * 1.4); ctx.fillStyle = p.c || '#fff'; ctx.fillRect(sx, sy, z, z);
+      }
+    }
+    ctx.globalAlpha = 1;
+
+    // meteors
+    for (const m of meteors) {
+      ctx.imageSmoothingEnabled = true;
+      ctx.globalAlpha = 0.8;
+      ctx.drawImage(glowSpr, ox + (m.x - 6 * K) * z, oy + (m.y - 6 * K) * z, 12 * K * z, 12 * K * z);
+      ctx.imageSmoothingEnabled = false;
+      ctx.globalAlpha = 1;
+      ctx.fillStyle = '#4a3a34'; ctx.fillRect(ox + (m.x - 1.5 * K) * z, oy + (m.y - 1.5 * K) * z, 3 * K * z, 3 * K * z);
+      ctx.fillStyle = '#ffb347'; ctx.fillRect(ox + (m.x - 1.5 * K) * z, oy + (m.y + 0.5 * K) * z, 3 * K * z, K * z);
+    }
+
+    drawAnimals(ox, oy, z, 'sky');
+
+    // clouds
+    for (const cl of clouds) {
+      ctx.globalAlpha = cl.alpha;
+      ctx.drawImage(cl.sp.c, ox + cl.x * z, oy + cl.y * z, cl.w * z, cl.h * z);
+    }
+    ctx.globalAlpha = 1;
+
+    // night & dusk
+    if (warm > 0.01) {
+      ctx.globalCompositeOperation = 'soft-light';
+      ctx.fillStyle = `rgba(255,120,50,${warm})`;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.globalCompositeOperation = 'source-over';
+    }
+    if (dark > 0.01) {
+      ctx.fillStyle = `rgba(8,14,46,${dark})`;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.imageSmoothingEnabled = true;
+      const ga = Math.min(0.9, dark * 1.5);
+      const step = lights.length > 1500 ? 2 : 1;
+      for (let k = 0; k < lights.length; k += 3 * step) {
+        const s = lights[k + 2], size = (s > 1 ? 16 : 11) * z;
+        ctx.globalAlpha = ga * Math.min(1, s);
+        ctx.drawImage(glowSpr, ox + lights[k] * z - size / 2, oy + lights[k + 1] * z - size / 2, size, size);
+      }
+      for (const m of meteors) { ctx.globalAlpha = ga; ctx.drawImage(glowSpr, ox + (m.x - 12) * z, oy + (m.y - 12) * z, 24 * z, 24 * z); }
+      drawFireflies(ox, oy, z);
+      ctx.globalAlpha = 1;
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.imageSmoothingEnabled = false;
+    }
+
+    // lightning
+    for (const b of bolts) {
+      const a = b.life / 10;
+      for (const [pts, wmul] of [[b.pts, 1], [b.br, 0.6]]) {
+        ctx.beginPath();
+        pts.forEach((p, k) => k ? ctx.lineTo(ox + p[0] * z, oy + p[1] * z) : ctx.moveTo(ox + p[0] * z, oy + p[1] * z));
+        ctx.strokeStyle = `rgba(160,185,255,${0.5 * a})`; ctx.lineWidth = 3.2 * z * wmul; ctx.stroke();
+        ctx.strokeStyle = `rgba(255,255,255,${a})`; ctx.lineWidth = Math.max(1, 1.1 * z * wmul); ctx.stroke();
+      }
+    }
+    if (flash > 0.01) { ctx.fillStyle = `rgba(235,240,255,${flash})`; ctx.fillRect(0, 0, canvas.width, canvas.height); flash *= 0.8; }
+
+    if (cursor) {
+      ctx.strokeStyle = 'rgba(255,255,255,0.75)';
+      ctx.lineWidth = Math.max(1, dpr);
+      ctx.beginPath();
+      ctx.arc(cursor.x, cursor.y, shotCd(tool) ? 6 * dpr : (brushR + 0.5) * SUB * z, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+  }
+
+  // ================= tools =================
+  const ONESHOT = { bolt: 180, meteor: 380, cloud: 700, tornado: 1500, inspect: 250 };
+  function shotCd(t) { return ONESHOT[t] || (SPECIES[t] ? 260 : 0); }
+  function applyTool(fx, fy) {
+    const cx = Math.floor(fx), cy = Math.floor(fy), Rb = brushR;
+    for (let dy = -Rb; dy <= Rb; dy++) for (let dx = -Rb; dx <= Rb; dx++) {
+      const d = Math.hypot(dx, dy);
+      if (d > Rb + 0.3) continue;
+      const x = cx + dx, y = cy + dy;
+      if (x < 0 || y < 0 || x >= W || y >= H) continue;
+      const i = y * W + x, h = hgt[i], c = cover[i], fall = 1 - d / (Rb + 1);
+      switch (tool) {
+        case 'raise': setH(i, h + 0.014 * fall); break;
+        case 'lower': setH(i, h - 0.014 * fall); break;
+        case 'fire':
+          if (isVeg(h) && wet[i] === 0) {
+            snow[i] = 0;
+            if (c === C_TREE) { cover[i] = C_FIRE; timer[i] = 28 + ((rnd() * 16) | 0); }
+            else if (c === C_NONE && rnd() < 0.35) { cover[i] = C_FIRE; timer[i] = 10 + ((rnd() * 8) | 0); }
+          }
+          break;
+        case 'rain':
+          if (c === C_FIRE) { cover[i] = C_BURNT; timer[i] = 60 + ((rnd() * 60) | 0); }
+          if (c === C_LAVA) { timer[i] -= 4; if (rnd() < 0.1) steamAt(x * SUB + 2, y * SUB); }
+          if (h >= SEA) wet[i] = 120;
+          if (snow[i] > 0) snow[i] = Math.max(0, snow[i] - 20);
+          break;
+        case 'snow':
+          if (h < SEA) { if (c !== C_ICE) { cover[i] = C_ICE; timer[i] = 350 + ((rnd() * 250) | 0); } }
+          else {
+            if (c === C_FIRE) { cover[i] = C_BURNT; timer[i] = 60; }
+            if (c === C_LAVA) { cover[i] = C_BASALT; timer[i] = 900; steamAt(x * SUB + 2, y * SUB); }
+            else snow[i] = Math.min(900, snow[i] + 60 * fall);
+          }
+          break;
+        case 'lava':
+          if (rnd() < 0.3 * fall) {
+            if (h >= SEA) { cover[i] = C_LAVA; timer[i] = 40 + ((rnd() * 20) | 0); snow[i] = 0; }
+            else { setH(i, SEA + 0.012); cover[i] = C_BASALT; timer[i] = 900; steamAt(x * SUB + 2, y * SUB); }
+          }
+          break;
+        case 'tree':
+          if (isVeg(h)) {
+            if (c === C_BURNT || c === C_BASALT) cover[i] = C_NONE;
+            else if (c === C_NONE && rnd() < 0.18) cover[i] = C_TREE;
+          }
+          break;
+        case 'clear': cover[i] = C_NONE; snow[i] = 0; wet[i] = 0; break;
+      }
+    }
+    const spread = () => ({ x: (fx + (rnd() * 2 - 1) * Rb) * SUB, y: (fy + (rnd() * 2 - 1) * Rb) * SUB });
+    if (tool === 'rain') for (let k = 0; k < 5; k++) { const s = spread(); rainAt(s.x, s.y); }
+    if (tool === 'snow') for (let k = 0; k < 3; k++) { const s = spread(); snowAt(s.x, s.y); }
+    if (tool === 'lava') for (let k = 0; k < 2; k++) { const s = spread(); emberAt(s.x, s.y); }
+    if (tool === 'fire') { const s = spread(); emberAt(s.x, s.y); if (cool('tfire', 110)) SFX.crackle(0.12); }
+    if ((tool === 'raise' || tool === 'lower') && cool('earth', 260)) SFX.rumble();
+    if (tool === 'lava' && cool('tlava', 280)) SFX.blup();
+    dirty = true;
+  }
+  function toTile(p) { return { x: (p.x - camX) / zoom / SUB, y: (p.y - camY) / zoom / SUB }; }
+  function paintAt(p) { const t = toTile(p); applyTool(t.x, t.y); }
+  function shootAt(p) {
+    const t = toTile(p);
+    if (tool !== 'inspect' && (t.x < 0 || t.y < 0 || t.x >= W || t.y >= H)) return;
+    if (tool === 'inspect') { pickAnimal(p); return; }
+    if (SPECIES[tool]) spawnFromTool(tool, t.x, t.y);
+    else if (tool === 'bolt') strike(t.x, t.y, false);
+    else if (tool === 'meteor') launchMeteor(t.x, t.y);
+    else if (tool === 'cloud') spawnStorm(t.x, t.y);
+    else if (tool === 'tornado') spawnTornado(t.x, t.y);
+  }
+  function paintLine(a, b) {
+    const ta = toTile(a), tb = toTile(b);
+    const steps = Math.max(1, Math.ceil(Math.hypot(tb.x - ta.x, tb.y - ta.y) / 1.5));
+    for (let s = 1; s <= steps; s++) applyTool(ta.x + (tb.x - ta.x) * s / steps, ta.y + (tb.y - ta.y) * s / steps);
+  }
+
+  // ================= input =================
+  const ptrs = new Map();
+  let mode = 'idle', pinch = null, lastPos = null, panMode = false, painting = false, pendingTimer = null, lastShot = 0;
+  function devPos(e) { const r = canvas.getBoundingClientRect(); return { x: (e.clientX - r.left) * dpr, y: (e.clientY - r.top) * dpr }; }
+  const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+  const mid = (a, b) => ({ x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 });
+  function startPainting(p) {
+    painting = true; cursor = p;
+    if (shotCd(tool)) { shootAt(p); lastShot = performance.now(); }
+    else paintAt(p);
+  }
+
+  canvas.addEventListener('pointerdown', e => {
+    const p = devPos(e);
+    ptrs.set(e.pointerId, p);
+    try { canvas.setPointerCapture(e.pointerId); } catch (_) {}
+    if (ptrs.size === 2) {
+      clearTimeout(pendingTimer); painting = false; cursor = null;
+      const [a, b] = [...ptrs.values()];
+      pinch = { d: Math.max(10, dist(a, b)), z: zoom, m: mid(a, b), cx: camX, cy: camY };
+      mode = 'pinch';
+      return;
+    }
+    if (ptrs.size > 2) return;
+    lastPos = p;
+    if (panMode || e.button === 1 || e.button === 2) { mode = 'pan'; return; }
+    mode = 'paint';
+    if (e.pointerType === 'mouse') startPainting(p);
+    else pendingTimer = setTimeout(() => { if (mode === 'paint') startPainting(lastPos); }, 80);
+  });
+  canvas.addEventListener('pointermove', e => {
+    const p = devPos(e);
+    if (!ptrs.has(e.pointerId)) { if (e.pointerType === 'mouse') cursor = p; return; }
+    ptrs.set(e.pointerId, p);
+    if (mode === 'pinch' && ptrs.size >= 2) {
+      const [a, b] = [...ptrs.values()];
+      const m = mid(a, b);
+      const nz = clamp(pinch.z * dist(a, b) / pinch.d, minZoom, maxZoom);
+      const wx0 = (pinch.m.x - pinch.cx) / pinch.z, wy0 = (pinch.m.y - pinch.cy) / pinch.z;
+      zoom = nz; camX = m.x - wx0 * zoom; camY = m.y - wy0 * zoom; clampCam();
+    } else if (mode === 'pan') {
+      camX += p.x - lastPos.x; camY += p.y - lastPos.y; lastPos = p; clampCam();
+    } else if (mode === 'paint') {
+      if (painting) { if (!shotCd(tool)) paintLine(lastPos, p); cursor = p; }
+      lastPos = p;
+    }
+  });
+  function endPtr(e) {
+    ptrs.delete(e.pointerId);
+    if (ptrs.size === 0) {
+      clearTimeout(pendingTimer);
+      mode = 'idle'; painting = false;
+      if (e.pointerType !== 'mouse') cursor = null;
+    } else if (mode === 'pinch') mode = 'idle';
+  }
+  canvas.addEventListener('pointerup', endPtr);
+  canvas.addEventListener('pointercancel', endPtr);
+  canvas.addEventListener('pointerleave', e => { if (e.pointerType === 'mouse' && !ptrs.size) cursor = null; });
+  canvas.addEventListener('contextmenu', e => e.preventDefault());
+  canvas.addEventListener('wheel', e => {
+    e.preventDefault();
+    const p = devPos(e);
+    zoomAt(p.x, p.y, zoom * Math.pow(1.0015, -e.deltaY));
+  }, { passive: false });
+
+  // ================= UI: tabs & pixel icons =================
+  const ICONS = {
+    tabLand: { rows: ['........', '....w...', '...wsw..', '..wssss.', '.gssssss', 'ggsssggg', 'gggggggg', '........'], pal: { w: '#eef3f7', s: '#8a8a90', g: '#5cb84a' } },
+    fire: { rows: ['...y....', '..yy..y.', '..yoy.y.', '.yoooyy.', '.oorooy.', 'yorrroo.', '.orrro..', '..ooo...'], pal: { y: '#ffe45c', o: '#ff8a1e', r: '#d8361c' } },
+    rain: { rows: ['...b....', '...b....', '..bbb...', '.bbbbb..', '.blbbb..', '.bbbbb..', '..bbb...', '........'], pal: { b: '#4aa8ff', l: '#cfe9ff' } },
+    snow: { rows: ['...w....', '.w.w.w..', '..www...', 'wwwcwww.', '..www...', '.w.w.w..', '...w....', '........'], pal: { w: '#dff4ff', c: '#7fd0ff' } },
+    cloud: { rows: ['...gg...', '.gglgg..', 'glllllgg', 'gggggggg', '.dddddd.', '..y..b..', '.y..b...', '........'], pal: { g: '#aab4bf', l: '#e6ebf0', d: '#6b7480', y: '#ffe45c', b: '#5ab0ff' } },
+    bolt: { rows: ['....yy..', '...yy...', '..yy....', '.yyyyy..', '...yy...', '..yy....', '.yy.....', '.y......'], pal: { y: '#ffe45c' } },
+    tornado: { rows: ['wwwwwwww', '.gwwwwg.', '..wwww..', '..gwwg..', '...ww...', '...gw...', '....w...', '...gg...'], pal: { w: '#e4e8ec', g: '#9aa4ae' } },
+    lava: { rows: ['........', '...rr...', '..royr..', '.rooyor.', 'roooyoor', 'rroooorr', 'ddrrrrdd', 'dddddddd'], pal: { r: '#d8361c', o: '#ff8a1e', y: '#ffe45c', d: '#3a2a26' } },
+    meteor: { rows: ['y.......', '.o......', '..oo....', '...orr..', '...rddd.', '....dgdd', '....dddd', '.....dd.'], pal: { y: '#ffe45c', o: '#ff8a1e', r: '#d8361c', d: '#5a4a44', g: '#8a7a70' } },
+    lower: { rows: ['...r....', '...r....', '.rrrrr..', '..rrr...', '...r....', '........', 'bbbbbbbb', 'lblbblbb'], pal: { r: '#ff5a3c', b: '#2e74d0', l: '#7fc0ff' } },
+    raise: { rows: ['...g....', '..ggg...', '.ggggg..', '...g....', '...w....', '..wss...', '.wssss..', 'wsssssss'], pal: { g: '#7cff5a', w: '#eef3f7', s: '#8a8a90' } },
+    tree: { rows: ['..lll...', '.lmmml..', 'lmmmmmd.', 'lmmmmdd.', '.mmmdd..', '...t....', '...t....', '..ttt...'], pal: { l: '#7cd35a', m: '#3e9a3e', d: '#22662e', t: '#7a4e2a' } },
+    inspect: { rows: ['.www....', 'w...w...', 'w...w...', 'w...w...', '.www....', '....bb..', '.....bb.', '......bb'], pal: { w: '#e8f0ff', b: '#c8a060' } },
+    clear: { rows: ['r......r', '.r....r.', '..r..r..', '...rr...', '...rr...', '..r..r..', '.r....r.', 'r......r'], pal: { r: '#ff5a3c' } }
+  };
+  const TABS = [
+    { id: 'land', label: 'Земля', icon: 'tabLand', tools: [['raise', 'Вище'], ['lower', 'Нижче'], ['tree', 'Ліс'], ['clear', 'Чисто']] },
+    { id: 'weather', label: 'Погода', icon: 'cloud', tools: [['rain', 'Дощ'], ['snow', 'Сніг'], ['cloud', 'Хмара'], ['bolt', 'Грім'], ['tornado', 'Смерч']] },
+    { id: 'chaos', label: 'Лихо', icon: 'meteor', tools: [['fire', 'Вогонь'], ['lava', 'Лава'], ['meteor', 'Метеор']] },
+    { id: 'herb', label: 'Травоїдні', icon: 'cow', tools: [['inspect', 'Огляд'], ['cow', 'Корова'], ['sheep', 'Вівця'], ['chicken', 'Курка'], ['rabbit', 'Заєць'], ['deer', 'Олень'], ['zebra', 'Зебра'], ['elephant', 'Слон'], ['camel', 'Верблюд'], ['penguin', 'Пінгвін'], ['frog', 'Жаба']] },
+    { id: 'pred', label: 'Хижаки', icon: 'wolf', tools: [['inspect', 'Огляд'], ['wolf', 'Вовк'], ['fox', 'Лисиця'], ['bear', 'Ведмідь'], ['polar', 'Полярний'], ['lion', 'Лев'], ['tiger', 'Тигр'], ['croc', 'Крокодил']] },
+    { id: 'sea', label: 'Море', icon: 'whale', tools: [['inspect', 'Огляд'], ['fish', 'Риби'], ['whale', 'Кит'], ['shark', 'Акула'], ['dolphin', 'Дельфін'], ['crab', 'Краб']] },
+    { id: 'sky', label: 'Небо', icon: 'bird', tools: [['inspect', 'Огляд'], ['bird', 'Птахи'], ['gull', 'Чайки'], ['eagle', 'Орел'], ['bat', 'Кажани'], ['butterfly', 'Метелик']] }
+  ];
+  const HINTS = {
+    raise: 'Тримай — земля росте', lower: 'Тримай — копай і топи', tree: 'Саджай ліс', clear: 'Прибирає все з землі',
+    rain: 'Гасить вогонь і поливає землю', snow: 'Сніг на землі, лід на воді', cloud: 'Гроза: дощ, сніг і блискавки',
+    bolt: 'Торкнись — удар блискавки', tornado: 'Смерч вириває дерева', fire: 'Підпали — вітер рознесе вогонь',
+    lava: 'Лава тече вниз, у воді застигає', meteor: 'Торкнись — метеорит', inspect: 'Торкнись звіра — побачиш, що він робить'
+  };
+  function iconCanvas(ic) {
+    const c = document.createElement('canvas'); c.width = 8; c.height = 8;
+    const g = c.getContext('2d');
+    ic.rows.forEach((row, y) => { for (let x = 0; x < 8; x++) { const ch = row[x]; if (ch && ch !== '.') { g.fillStyle = ic.pal[ch]; g.fillRect(x, y, 1, 1); } } });
+    return c;
+  }
+  let toastTimer = null;
+  function showToast(text, ms) {
+    toastEl.textContent = text; toastEl.style.opacity = '1';
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { toastEl.style.opacity = '0'; }, ms);
+  }
+  const tabsEl = document.getElementById('tabs'), toolbar = document.getElementById('toolbar');
+  let tab = 'weather';
+  function buildTabs() {
+    tabsEl.innerHTML = '';
+    TABS.forEach(t => {
+      const b = document.createElement('button');
+      b.className = 'tab' + (t.id === tab ? ' active' : '');
+      b.appendChild(ICONS[t.icon] ? iconCanvas(ICONS[t.icon]) : spriteIcon(t.icon));
+      b.title = t.label; b.setAttribute('aria-label', t.label);
+      b.addEventListener('click', () => { tab = t.id; buildTabs(); buildTools(); showToast(t.label, 1000); });
+      tabsEl.appendChild(b);
+    });
+  }
+  function buildTools() {
+    toolbar.innerHTML = '';
+    TABS.find(t => t.id === tab).tools.forEach(([id, label]) => {
+      const b = document.createElement('button');
+      b.className = 'tool' + (id === tool ? ' active' : '');
+      b.appendChild(ICONS[id] ? iconCanvas(ICONS[id]) : spriteIcon(id));
+      const s = document.createElement('span'); s.textContent = label; b.appendChild(s);
+      b.addEventListener('click', () => {
+        tool = id;
+        if (id !== 'inspect') { selected = null; updateInspect(); }
+        if (panMode) { panMode = false; panBtn.classList.remove('on'); }
+        buildTools();
+        showToast(HINTS[id] || ('Торкнись карти: ' + label.toLowerCase()), 1800);
+        SFX.click();
+      });
+      toolbar.appendChild(b);
+    });
+  }
+  buildTabs(); buildTools();
+
+  const panBtn = document.getElementById('panBtn');
+  panBtn.addEventListener('click', () => { panMode = !panMode; panBtn.classList.toggle('on', panMode); });
+  const brushBtn = document.getElementById('brushBtn');
+  const SIZES = [[2, 'S'], [3, 'M'], [5, 'L']];
+  brushBtn.addEventListener('click', () => {
+    const k = (SIZES.findIndex(s => s[0] === brushR) + 1) % SIZES.length;
+    brushR = SIZES[k][0]; brushBtn.textContent = SIZES[k][1];
+  });
+  const dayBtn = document.getElementById('dayBtn');
+  dayBtn.addEventListener('click', () => { dayCycle = !dayCycle; dayBtn.classList.toggle('on', dayCycle); });
+  const pauseBtn = document.getElementById('pauseBtn');
+  pauseBtn.addEventListener('click', () => { paused = !paused; pauseBtn.textContent = paused ? '▶' : '❚❚'; pauseBtn.classList.toggle('on', paused); });
+  document.getElementById('regenBtn').addEventListener('click', () => { generate(); fitCamera(); zoomAt(canvas.width / 2, canvas.height / 2, zoom * 1.5); });
+  const soundBtn = document.getElementById('soundBtn');
+  soundBtn.addEventListener('click', () => {
+    initAudio();
+    soundOn = !soundOn;
+    soundBtn.textContent = soundOn ? '🔊' : '🔇';
+    if (master) master.gain.setTargetAtTime(soundOn ? 0.7 : 0, AC.currentTime, 0.05);
+  });
+  window.addEventListener('pointerdown', initAudio, true);
+
+  // ================= loop =================
+  let lastTick = 0, lastHold = 0, lastTs = 0;
+  function loop(ts) {
+    const dt = Math.min(100, ts - (lastTs || ts)); lastTs = ts;
+    if (!paused) {
+      if (ts - lastTick > TICK) {
+        lastTick = ts;
+        windA += (rnd() - 0.5) * 0.06;
+        windS = 0.65 + 0.35 * Math.sin(ts / 23000);
+        wx = Math.cos(windA); wy = Math.sin(windA);
+        simulate(); weatherTick();
+        frame++; dirty = true;
+      }
+      if (dayCycle) tod = (tod + dt / 150000) % 1;
+      updateClouds(); updateEntities(); updateAnimals(); updateParticles();
+    }
+    if (dayCycle) {
+      const sun = Math.cos(tod * Math.PI * 2);
+      dark = clamp((-0.2 - sun) * 0.9, 0, 0.62);
+      warm = clamp(1 - Math.abs(sun + 0.1) * 3.5, 0, 1) * 0.3;
+    } else { dark = 0; warm = 0; }
+    if (painting && mode === 'paint') {
+      if (shotCd(tool)) { if (ts - lastShot > shotCd(tool)) { lastShot = ts; shootAt(lastPos); } }
+      else if (ts - lastHold > 70) { lastHold = ts; paintAt(lastPos); }
+    }
+    if (dirty) { renderBuffer(); dirty = false; }
+    render();
+    if (AC) { if (fc % 6 === 0) audioTick(ts); ambientSfx(); animalVoices(); }
+    if ((frame & 3) === 0) {
+      const mins = Math.floor(((12 + tod * 24) % 24) * 60);
+      timeLbl.textContent = (dark > 0.25 ? '☾ ' : '☀ ') + String(Math.floor(mins / 60)).padStart(2, '0') + ':' + String(mins % 60).padStart(2, '0');
+      windArrow.style.transform = `rotate(${windA}rad)`;
+      let na = 0; for (const a of animals) if (a.S.key !== 'firefly') na++;
+      animalLbl.textContent = '🐾 ' + na;
+      updateInspect();
+    }
+    requestAnimationFrame(loop);
+  }
+
+  sizeCanvas();
+  setupWorld();
+  generate();
+  fitCamera(); zoomAt(canvas.width / 2, canvas.height / 2, zoom * 1.5);
+  window.addEventListener('resize', () => { sizeCanvas(); clampCam(); if (zoom < minZoom) fitCamera(); });
+  const coarse = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+  showToast(coarse ? 'Два пальці — масштаб і рух' : 'Колесо — масштаб, права кнопка — рух', 4000);
+  requestAnimationFrame(loop);
+})();
+</script>
+</body>
+</html>
