@@ -13,6 +13,7 @@ import { world } from '../world/state';
 import { SUB, SEA, C_NONE, C_FIRE, C_BURNT, C_ICE, C_LAVA, C_BASALT } from '../world/constants';
 import { camera } from './camera';
 import { view } from './context';
+import { markCells } from './dirty';
 
 /** Субпікселів ефектів на клітинку (як у рельєфу — краї такі ж чіткі). */
 export const ER = SUB;
@@ -90,7 +91,8 @@ function computeCells(frame: number): void {
       if (c === C_ICE) over(222, 244, 252, 0.96);
     } else {
       if (wet[i] > 0) over(30, 50, 84, 0.16);
-      if (c === C_NONE && grazed[i] > 0) over(164, 134, 86, Math.min(0.55, grazed[i] / 260));
+      // витоптане: сходинками по 50, щоб стежки не перемальовувались щотіку, поки заростають
+      if (c === C_NONE && grazed[i] >= 50) over(164, 134, 86, Math.min(0.55, (grazed[i] - grazed[i] % 50) / 260));
       if (c === C_BURNT) over(56, 44, 38, 0.86);
       else if (c === C_BASALT) {
         const hot = timer[i] > 500 ? Math.min(1, (timer[i] - 500) / 400) : 0;
@@ -114,34 +116,36 @@ function computeCells(frame: number): void {
   }
 }
 
-/** Розмиття 1-2-1 по обох осях: src → dst. */
-function blur(src: Float32Array, dst: Float32Array): void {
+/** Розмиття 1-2-1 по обох осях у прямокутнику клітинок (включно): src → dst. */
+function blur(src: Float32Array, dst: Float32Array, x0: number, y0: number, x1: number, y1: number): void {
   const { W, H } = world;
-  for (let y = 0; y < H; y++) {
+  const ya = Math.max(0, y0 - 1), yb = Math.min(H - 1, y1 + 1);
+  for (let y = ya; y <= yb; y++) {
     const r = y * W;
-    for (let x = 0; x < W; x++) {
+    for (let x = x0; x <= x1; x++) {
       const l = src[r + (x > 0 ? x - 1 : x)], c = src[r + x], rr = src[r + (x < W - 1 ? x + 1 : x)];
       tmp[r + x] = (l + 2 * c + rr) * 0.25;
     }
   }
-  for (let y = 0; y < H; y++) {
+  for (let y = y0; y <= y1; y++) {
     const ru = (y > 0 ? y - 1 : y) * W, r = y * W, rd = (y < H - 1 ? y + 1 : y) * W;
-    for (let x = 0; x < W; x++) dst[r + x] = (tmp[ru + x] + 2 * tmp[r + x] + tmp[rd + x]) * 0.25;
+    for (let x = x0; x <= x1; x++) dst[r + x] = (tmp[ru + x] + 2 * tmp[r + x] + tmp[rd + x]) * 0.25;
   }
 }
-/** Максимум в околі 3×3: src → dst. */
-function max3(src: Float32Array, dst: Float32Array): void {
+/** Максимум в околі 3×3 у прямокутнику: src → dst. */
+function max3(src: Float32Array, dst: Float32Array, x0: number, y0: number, x1: number, y1: number): void {
   const { W, H } = world;
-  for (let y = 0; y < H; y++) {
+  const ya = Math.max(0, y0 - 1), yb = Math.min(H - 1, y1 + 1);
+  for (let y = ya; y <= yb; y++) {
     const r = y * W;
-    for (let x = 0; x < W; x++) {
+    for (let x = x0; x <= x1; x++) {
       const l = src[r + (x > 0 ? x - 1 : x)], c = src[r + x], rr = src[r + (x < W - 1 ? x + 1 : x)];
       tmp[r + x] = l > c ? (l > rr ? l : rr) : (c > rr ? c : rr);
     }
   }
-  for (let y = 0; y < H; y++) {
+  for (let y = y0; y <= y1; y++) {
     const ru = (y > 0 ? y - 1 : y) * W, r = y * W, rd = (y < H - 1 ? y + 1 : y) * W;
-    for (let x = 0; x < W; x++) {
+    for (let x = x0; x <= x1; x++) {
       const u = tmp[ru + x], c = tmp[r + x], d = tmp[rd + x];
       dst[r + x] = u > c ? (u > d ? u : d) : (c > d ? c : d);
     }
@@ -190,8 +194,6 @@ function rasterize(cx0: number, cy0: number, cx1: number, cy1: number): void {
 
 export function updateEffects(frame: number): void {
   computeCells(frame);
-  blur(pr, br); blur(pg, bg); blur(pb, bb); blur(pa, ba);
-  max3(ba, mB); max3(pa, mA);
   const { W, H } = world;
   if (firstRun) { dirtyTiles.fill(1); firstRun = false; }
   for (let t = 0; t < dirtyTiles.length; t++) {
@@ -200,7 +202,13 @@ export function updateEffects(frame: number): void {
     const tx = t % tilesW, ty = (t / tilesW) | 0;
     const cx0 = tx * TILE, cy0 = ty * TILE;
     const cx1 = Math.min(W - 1, cx0 + TILE - 1), cy1 = Math.min(H - 1, cy0 + TILE - 1);
+    // розмите поле потрібне на плитці +1 (білінійка), а для максимуму — ще +1
+    const bx0 = Math.max(0, cx0 - 2), by0 = Math.max(0, cy0 - 2), bx1 = Math.min(W - 1, cx1 + 2), by1 = Math.min(H - 1, cy1 + 2);
+    blur(pr, br, bx0, by0, bx1, by1); blur(pg, bg, bx0, by0, bx1, by1); blur(pb, bb, bx0, by0, bx1, by1); blur(pa, ba, bx0, by0, bx1, by1);
+    const mx0 = Math.max(0, cx0 - 1), my0 = Math.max(0, cy0 - 1), mx1 = Math.min(W - 1, cx1 + 1), my1 = Math.min(H - 1, cy1 + 1);
+    max3(ba, mB, mx0, my0, mx1, my1); max3(pa, mA, mx0, my0, mx1, my1);
     rasterize(cx0, cy0, cx1, cy1);
     effectLayer.ctx.putImageData(effectLayer.img, 0, 0, cx0 * ER, cy0 * ER, (cx1 - cx0 + 1) * ER, (cy1 - cy0 + 1) * ER);
+    markCells(cx0, cy0, cx1, cy1);
   }
 }

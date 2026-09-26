@@ -16,11 +16,13 @@ import { updateClouds, weatherTick } from './sim/clouds';
 import { updateEntities } from './sim/events';
 import { updateParticles } from './sim/particles';
 import { updateAnimals } from './creatures/ai';
+import { civFrame } from './civ';
 import { creatureState } from './creatures/animal';
 import { audioState } from './audio/engine';
 import { audioTick, ambientSfx, animalVoices } from './audio/ambient';
 import { initToast, showToast } from './ui/toast';
 import { initHud, updateHud, savedWorldSize } from './ui/hud';
+import { initCivUi } from './ui/civPanel';
 import { uiState } from './ui/state';
 import { initTabs } from './ui/tabs';
 import { initInput, continuousPaint } from './ui/input';
@@ -34,6 +36,7 @@ initToast(document.getElementById('toast')!);
 initHud();
 initTabs(document.getElementById('tabs')!, document.getElementById('toolbar')!, updateInspect);
 initInput(canvas);
+initCivUi(document.getElementById('canvasWrap')!);
 
 sizeCanvas(wrap);
 uiState.worldSize = savedWorldSize();
@@ -69,6 +72,7 @@ function loop(ts: number): void {
     updateClouds();
     updateEntities(clock.frame);
     updateAnimals();
+    civFrame();
     updateParticles();
   }
   updateLighting();

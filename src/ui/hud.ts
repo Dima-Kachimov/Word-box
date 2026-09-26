@@ -13,6 +13,8 @@ import { initAudio, setSoundOn, audioState } from '../audio/engine';
 import { updateInspect } from './inspect';
 import { saveToLocalStorage, loadFromLocalStorage } from '../save/save';
 import { showToast } from './toast';
+import { updateCivUi } from './civPanel';
+import { units, kingdoms } from '../civ/state';
 
 let panBtn: HTMLButtonElement;
 let dayBtn: HTMLButtonElement;
@@ -95,14 +97,14 @@ export function initHud(): void {
   window.addEventListener('pointerdown', initAudio, true);
 
   const saveBtn = document.getElementById('saveBtn') as HTMLButtonElement;
-  saveBtn.addEventListener('click', () => {
-    saveToLocalStorage();
-    showToast('Світ збережено', 1400);
+  saveBtn.addEventListener('click', async () => {
+    const ok = await saveToLocalStorage();
+    showToast(ok ? 'Світ збережено' : 'Не вдалося зберегти — світ завеликий для сховища браузера', ok ? 1400 : 3000);
   });
 
   const loadBtn = document.getElementById('loadBtn') as HTMLButtonElement;
-  loadBtn.addEventListener('click', () => {
-    const ok = loadFromLocalStorage();
+  loadBtn.addEventListener('click', async () => {
+    const ok = await loadFromLocalStorage();
     showToast(ok ? 'Світ завантажено' : 'Немає збереження', 1400);
     if (ok) {
       fitCamera(); zoomAt(view.canvas.width / 2, view.canvas.height / 2, camera.minZoom);
@@ -114,6 +116,7 @@ export function initHud(): void {
 const timeLbl = document.getElementById('timeLbl')!;
 const windArrow = document.getElementById('windArrow')!;
 const animalLbl = document.getElementById('animalLbl')!;
+const peopleLbl = document.getElementById('peopleLbl')!;
 
 /** Оновлює текстові індикатори HUD — викликається раз на кілька кадрів. */
 export function updateHud(): void {
@@ -123,5 +126,9 @@ export function updateHud(): void {
   let na = 0;
   for (const a of animals) if (a.S.key !== 'firefly') na++;
   animalLbl.textContent = '🐾 ' + na;
+  let np = 0;
+  for (const u of units) if (!u.dead) np++;
+  peopleLbl.textContent = '👥 ' + np + ' · 🏰 ' + kingdoms.filter(k => k.alive).length;
   updateInspect();
+  updateCivUi();
 }

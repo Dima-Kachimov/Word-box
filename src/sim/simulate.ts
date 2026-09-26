@@ -17,6 +17,7 @@ function igniteNeighbor(j: number, dx: number, dy: number): void {
   const bf = (b === B_DESERT || b === B_SAVANNA) ? 1.5 : b === B_JUNGLE ? 0.8 : b === B_SWAMP ? 0.4 : b === B_TUNDRA ? 0.6 : 1;
   const wf = Math.max(0.15, 1 + 1.1 * (dx * clock.wx + dy * clock.wy) * clock.windS);
   if (c === C_TREE && rnd() < 0.14 * bf * wf) { world.cover[j] = C_FIRE; world.timer[j] = 28 + ((rnd() * 16) | 0); world.lit[j] = 1; }
+  else if (c === C_NONE && world.bld[j] && rnd() < 0.16 * wf) { world.cover[j] = C_FIRE; world.timer[j] = 40 + ((rnd() * 20) | 0); world.lit[j] = 1; }
   else if (c === C_NONE && rnd() < 0.035 * bf * wf) { world.cover[j] = C_FIRE; world.timer[j] = 10 + ((rnd() * 8) | 0); world.lit[j] = 1; }
 }
 
@@ -89,7 +90,7 @@ export function simulate(): void {
         else if (rnd() < 0.004) world.cover[i] = C_NONE;
         break;
       case C_NONE:
-        if (isVeg(h) && rnd() < GROW[b] * (world.wet[i] ? 2 : 1)) {
+        if (!world.bld[i] && isVeg(h) && rnd() < GROW[b] * (world.wet[i] ? 2 : 1)) {
           if ((x > 0 && world.cover[i - 1] === C_TREE) || (x < W - 1 && world.cover[i + 1] === C_TREE) ||
               (y > 0 && world.cover[i - W] === C_TREE) || (y < H - 1 && world.cover[i + W] === C_TREE)) world.cover[i] = C_TREE;
         }

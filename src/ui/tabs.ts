@@ -3,6 +3,10 @@
 
 import { hasIcon, iconCanvas } from './icons';
 import { getSpeciesIcon } from '../creatures/species';
+import { personSprite } from '../civ/art';
+import type { RaceId } from '../civ/races';
+import { toggleKingdomPanel } from './civPanel';
+import { civState } from '../civ/state';
 import { creatureState } from '../creatures/animal';
 import { uiState } from './state';
 import { showToast } from './toast';
@@ -18,6 +22,7 @@ interface TabDef {
 
 const TABS: TabDef[] = [
   { id: 'land', label: 'Земля', icon: 'tabLand', tools: [['raise', 'Вище'], ['lower', 'Нижче'], ['tree', 'Ліс'], ['clear', 'Чисто']] },
+  { id: 'civ', label: 'Народи', icon: 'tabCiv', tools: [['inspect', 'Огляд'], ['race0', 'Люди'], ['race1', 'Ельфи'], ['race2', 'Гноми'], ['race3', 'Орки'], ['war', 'Розбрат'], ['peace', 'Мир'], ['kingdoms', 'Держави']] },
   { id: 'weather', label: 'Погода', icon: 'cloud', tools: [['rain', 'Дощ'], ['snow', 'Сніг'], ['cloud', 'Хмара'], ['bolt', 'Грім'], ['tornado', 'Смерч']] },
   { id: 'chaos', label: 'Лихо', icon: 'meteor', tools: [['fire', 'Вогонь'], ['lava', 'Лава'], ['meteor', 'Метеор']] },
   { id: 'herb', label: 'Травоїдні', icon: 'cow', tools: [['inspect', 'Огляд'], ['cow', 'Корова'], ['sheep', 'Вівця'], ['chicken', 'Курка'], ['rabbit', 'Заєць'], ['deer', 'Олень'], ['zebra', 'Зебра'], ['elephant', 'Слон'], ['camel', 'Верблюд'], ['penguin', 'Пінгвін'], ['frog', 'Жаба']] },
@@ -30,7 +35,10 @@ const HINTS: Record<string, string> = {
   raise: 'Тримай — земля росте', lower: 'Тримай — копай і топи', tree: 'Саджай ліс', clear: 'Прибирає все з землі',
   rain: 'Гасить вогонь і поливає землю', snow: 'Сніг на землі, лід на воді', cloud: 'Гроза: дощ, сніг і блискавки',
   bolt: 'Торкнись — удар блискавки', tornado: 'Смерч вириває дерева', fire: 'Підпали — вітер рознесе вогонь',
-  lava: 'Лава тече вниз, у воді застигає', meteor: 'Торкнись — метеорит', inspect: 'Торкнись звіра — побачиш, що він робить'
+  lava: 'Лава тече вниз, у воді застигає', meteor: 'Торкнись — метеорит', inspect: 'Торкнись жителя, міста чи звіра',
+  race0: 'Торкнись суші — люди заснують королівство', race1: 'Торкнись лісу — ельфи заснують королівство',
+  race2: 'Торкнись гір — гноми заснують королівство', race3: 'Торкнись степу — орки заснують орду',
+  war: 'Торкнись міста — його королівство піде війною', peace: 'Торкнись міста — воно укладе мир'
 };
 
 let tabsEl: HTMLElement, toolbarEl: HTMLElement;
@@ -43,6 +51,12 @@ export function initTabs(tabs: HTMLElement, toolbar: HTMLElement, onInspectClear
 }
 
 function iconFor(id: string): HTMLCanvasElement {
+  if (id.startsWith('race')) {
+    const c = document.createElement('canvas'); c.width = c.height = 56;
+    const s = 56 / 11.5;
+    personSprite(+id[4] as RaceId, ['#3a7be8', '#2ec4b6', '#e8443a', '#9a4ae8'][+id[4]], 'king', 0).blit(c.getContext('2d')!, (56 - 6 * s) / 2, (56 - 9 * s) / 2, s);
+    return c;
+  }
   return hasIcon(id) ? iconCanvas(id) : getSpeciesIcon(id, 56);
 }
 
@@ -71,8 +85,9 @@ function buildTools(): void {
     b.appendChild(iconFor(id));
     const s = document.createElement('span'); s.textContent = label; b.appendChild(s);
     b.addEventListener('click', () => {
+      if (id === 'kingdoms') { toggleKingdomPanel(); SFX.click(); return; }
       uiState.tool = id;
-      if (id !== 'inspect') { creatureState.selected = null; onInspectCleared(); }
+      if (id !== 'inspect') { creatureState.selected = null; civState.selUnit = null; civState.selCity = null; onInspectCleared(); }
       setPanMode(false);
       buildTools();
       showToast(HINTS[id] || ('Торкнись карти: ' + label.toLowerCase()), 1800);

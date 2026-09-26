@@ -10,6 +10,7 @@ import { particles } from './particles';
 import { clouds, spawnAmbientCloud } from './clouds';
 import { tornados, meteors, bolts, waves } from './events';
 import { populate } from '../creatures/animal';
+import { seedCivilizations } from '../civ';
 
 export function initWorld(viewportW: number, viewportH: number, size: WorldSize): void {
   newWorld(viewportW, viewportH, size);
@@ -33,5 +34,6 @@ export function regenerateWorld(): void {
   waves.length = 0;
   for (let k = 0; k < Math.round(4 * world.popK); k++) spawnAmbientCloud(true);
   populate();
+  seedCivilizations();
   markDirty();
 }

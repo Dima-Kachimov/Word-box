@@ -13,11 +13,18 @@ import { spawnStorm } from './clouds';
 import { toTile, type Point } from '../render/camera';
 import { markDirty } from '../render/buffer';
 import { SPECIES } from '../creatures/species';
-import { spawnFromTool, pickAnimal } from '../creatures/animal';
+import { spawnFromTool, pickAnimal, creatureState } from '../creatures/animal';
+import { pickCiv, playerSpawnRace, playerWar, playerPeace } from '../civ/actions';
+import { civState } from '../civ/state';
+import type { RaceId } from '../civ/races';
+import { showToast } from '../ui/toast';
 
 export type ToolId = string;
 
-const ONESHOT: Record<string, number> = { bolt: 180, meteor: 380, cloud: 700, tornado: 1500, inspect: 250 };
+const ONESHOT: Record<string, number> = {
+  bolt: 180, meteor: 380, cloud: 700, tornado: 1500, inspect: 250,
+  race0: 900, race1: 900, race2: 900, race3: 900, war: 900, peace: 900
+};
 
 /** Скільки мс має пройти між "пострілами" цього інструмента (0 = це пензель, а не постріл). */
 export function shotCd(t: ToolId): number {
@@ -68,7 +75,7 @@ export function applyTool(tool: ToolId, brushR: number, fx: number, fy: number):
           else if (c === C_NONE && rnd() < 0.18) world.cover[i] = C_TREE;
         }
         break;
-      case 'clear': world.cover[i] = C_NONE; world.snow[i] = 0; world.wet[i] = 0; break;
+      case 'clear': world.cover[i] = C_NONE; world.snow[i] = 0; world.wet[i] = 0; world.bld[i] = 0; break;
     }
   }
   const spread = () => ({ x: (fx + (rnd() * 2 - 1) * Rb) * SUB, y: (fy + (rnd() * 2 - 1) * Rb) * SUB });
@@ -95,7 +102,14 @@ export function paintLine(tool: ToolId, brushR: number, a: Point, b: Point): voi
 export function shootAt(tool: ToolId, p: Point): void {
   const t = toTile(p);
   if (tool !== 'inspect' && (t.x < 0 || t.y < 0 || t.x >= world.W || t.y >= world.H)) return;
-  if (tool === 'inspect') { pickAnimal(p); return; }
+  if (tool === 'inspect') {
+    if (pickCiv(t.x, t.y)) { creatureState.selected = null; SFX.click(); }
+    else { civState.selUnit = null; civState.selCity = null; pickAnimal(p); }
+    return;
+  }
+  if (tool.startsWith('race')) { showToast(playerSpawnRace(+tool[4] as RaceId, t.x, t.y), 2200); SFX.pop(); return; }
+  if (tool === 'war') { showToast(playerWar(t.x, t.y), 2200); return; }
+  if (tool === 'peace') { showToast(playerPeace(t.x, t.y), 2200); return; }
   if (SPECIES[tool]) spawnFromTool(tool, t.x, t.y);
   else if (tool === 'bolt') strike(t.x, t.y, false);
   else if (tool === 'meteor') launchMeteor(t.x, t.y);

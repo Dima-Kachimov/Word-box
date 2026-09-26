@@ -17,6 +17,10 @@ import {
 } from '../world/constants';
 import { isVeg } from '../world/generate';
 import { Painter, volume, tint, shade, blob, TAU } from './cartoon';
+import { drawBuilding } from '../civ/art';
+import { markCells, markAll } from './dirty';
+import { BT } from '../civ/buildings';
+import type { RaceId } from '../civ/races';
 
 // ---------------------------------------------------------------- розміри
 /** Коробка спрайта в одиницях (1 одиниця = 1 піксель світу). */
@@ -32,11 +36,13 @@ type Kind = typeof KINDS[number];
 const DECOS = ['flowerR', 'flowerY', 'flowerW', 'pebble', 'lily', 'bush', 'flowerP'] as const;
 type Deco = typeof DECOS[number];
 
-// Порядок слотів у атласі: дерева (kind × snowy × flip), вогонь (3 кадри × flip), декор.
+// Порядок слотів у атласі: дерева (kind × snowy × flip), вогонь (3 кадри × flip),
+// декор, будівлі цивілізацій (раса × тип, код world.bld − 1).
 const TREE_SLOTS = KINDS.length * 4;
 const FIRE_SLOT0 = TREE_SLOTS;
 const DECO_SLOT0 = FIRE_SLOT0 + 6;
-const SLOTS = DECO_SLOT0 + DECOS.length;
+const BLD_SLOT0 = DECO_SLOT0 + DECOS.length;
+const SLOTS = BLD_SLOT0 + 4 * BT;
 const COLS = 10;
 
 // ---------------------------------------------------------------- малюнки дерев
@@ -264,6 +270,7 @@ function buildAtlas(R: number): HTMLCanvasElement {
   });
   for (let fr = 0; fr < 3; fr++) for (let f = 0; f < 2; f++) draw(FIRE_SLOT0 + fr * 2 + f, f === 1, gg => drawFire(gg, fr));
   DECOS.forEach((d, di) => draw(DECO_SLOT0 + di, false, gg => drawDeco(gg, d)));
+  for (let k = 0; k < 4 * BT; k++) draw(BLD_SLOT0 + k, false, gg => drawBuilding(gg, ((k / BT) | 0) as RaceId, k % BT));
   return c;
 }
 
@@ -292,6 +299,7 @@ function decoAt(i: number): Deco | null {
 /** Слот атласу для статичної рослинності клітинки (0 — нічого). Вогонь сюди не входить. */
 function vegSlot(i: number): number {
   const c = world.cover[i];
+  if (world.bld[i]) return c === C_NONE ? 1 + BLD_SLOT0 + world.bld[i] - 1 : 0;
   if (c === C_TREE) {
     const k = KINDS.indexOf(treeKind(i));
     return 1 + k * 4 + (world.snow[i] > 60 ? 2 : 0) + (world.vari[i] > 0.5 ? 1 : 0);
@@ -306,11 +314,11 @@ function vegSlot(i: number): number {
 /** Де в пікселях світу малювати спрайт клітинки (лівий верхній кут слота). */
 function spritePos(x: number, y: number, slot: number, i: number): [number, number] {
   const v = world.vari[i];
-  if (slot >= DECO_SLOT0) {
+  if (slot >= DECO_SLOT0 && slot < BLD_SLOT0) {
     const sx = x * SUB + (((v * 37) | 0) % (SUB - 2)), sy = y * SUB + (((v * 91) | 0) % (SUB - 2));
     return [sx + 0.5 - 2 - PAD, sy + 0.5 - 2 - PAD];
   }
-  const jitter = (((v * 1300) | 0) % 100 / 100 - 0.5) * 1.6;
+  const jitter = slot >= BLD_SLOT0 ? 0 : (((v * 1300) | 0) % 100 / 100 - 0.5) * 1.6;
   return [x * SUB + SUB / 2 + jitter - BASE_X - PAD, y * SUB + SUB - 0.4 - BASE_Y - PAD];
 }
 
@@ -357,13 +365,19 @@ function fullRedraw(): void {
   for (let i = 0; i < N; i++) keys[i] = vegSlot(i);
   vegLayer.ctx.clearRect(0, 0, vegLayer.canvas.width, vegLayer.canvas.height);
   drawRegion(vegLayer.ctx, 0, 0, W - 1, H - 1);
+  markAll();
 }
+
+let scanPhase = 0;
+/** Скільки частин світу перевіряти по черзі (рядки через один/два) — зміни видно з затримкою ≤ 3 тіків. */
+const SCAN_STEP = 3;
 
 /** Звіряє, що змінилось у рослинності, і перемальовує лише зачеплені плитки. */
 export function updateVegetation(): void {
-  const { W, N } = world;
+  const { W, H, N } = world;
   let changed = 0;
-  for (let i = 0; i < N; i++) {
+  scanPhase = (scanPhase + 1) % SCAN_STEP;
+  for (let y = scanPhase; y < H; y += SCAN_STEP) for (let i = y * W, e = i + W; i < e; i++) {
     const k = vegSlot(i);
     if (k === keys[i]) continue;
     keys[i] = k;
@@ -388,6 +402,7 @@ export function updateVegetation(): void {
     g.clearRect(px, py, pw, ph);
     drawRegion(g, cx0 - 2, cy0 - 1, cx0 + TILE + 1, cy0 + TILE + 2);
     g.restore();
+    markCells(cx0, cy0, cx0 + TILE - 1, cy0 + TILE - 1);
   }
 }
 

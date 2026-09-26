@@ -16,6 +16,8 @@ import { camera } from './camera';
 import { terrainLayer, setupTerrain, updateTerrain } from './terrain';
 import { effectLayer, setupEffects, updateEffects } from './effects';
 import { vegLayer, setupVegetation, updateVegetation, bumpVegVersion, HI_CELL } from './vegetation';
+import { composeTerritory, updateTerritory } from '../civ/render';
+import { composeDirty, setupDirty, DTILE } from './dirty';
 
 export { lights, weatherStats, viewBounds } from './effects';
 
@@ -43,15 +45,37 @@ export function setupTileBuffer(): void {
   c.width = world.BW; c.height = world.BH;
   worldImage.canvas = c;
   worldImage.ctx = c.getContext('2d')!;
+  setupDirty();
   markDirty();
 }
 
+/** Зводить прямокутник клітинок усіх шарів у зображення світу. */
+function composeRect(g: CanvasRenderingContext2D, x0: number, y0: number, w: number, h: number, hi: boolean): void {
+  const px = x0 * SUB, py = y0 * SUB, pw = Math.min(w * SUB, world.BW - px), ph = Math.min(h * SUB, world.BH - py);
+  if (pw <= 0 || ph <= 0) return;
+  g.drawImage(terrainLayer.canvas, px, py, pw, ph, px, py, pw, ph);
+  g.drawImage(effectLayer.canvas, px, py, pw, ph, px, py, pw, ph);
+  composeTerritory(g, x0, y0, pw / SUB, ph / SUB);
+  if (!hi) g.drawImage(vegLayer.canvas, px, py, pw, ph, px, py, pw, ph);
+}
+
+/**
+ * Зводить шари в одне зображення світу. Лише плитки, які шари позначили
+ * зміненими (render/dirty.ts), — або все, якщо змінився режим/розмір.
+ */
 export function composeWorld(hi: boolean): void {
-  const g = worldImage.ctx;
+  const g = worldImage.ctx, d = composeDirty;
   g.imageSmoothingEnabled = true;
-  g.drawImage(terrainLayer.canvas, 0, 0);
-  g.drawImage(effectLayer.canvas, 0, 0, world.BW, world.BH);
-  if (!hi) g.drawImage(vegLayer.canvas, 0, 0);
+  if (hi !== worldImage.hi) d.all = true;
+  if (d.all || d.count > d.tiles.length * 0.4) {
+    composeRect(g, 0, 0, world.W, world.H, hi);
+  } else if (d.count) {
+    for (let k = 0; k < d.tiles.length; k++) {
+      if (!d.tiles[k]) continue;
+      composeRect(g, (k % d.tw) * DTILE, ((k / d.tw) | 0) * DTILE, DTILE, DTILE, hi);
+    }
+  }
+  d.tiles.fill(0); d.count = 0; d.all = false;
   worldImage.hi = hi;
 }
 
@@ -60,6 +84,7 @@ export function renderBuffer(frame: number): void {
   if (!terrainLayer.canvas || terrainLayer.canvas.width !== world.BW || terrainLayer.canvas.height !== world.BH) setupTileBuffer();
   updateTerrain();
   updateEffects(frame);
+  updateTerritory();
   updateVegetation();
   bumpVegVersion();
   composeWorld(isHiDetail());

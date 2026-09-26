@@ -104,6 +104,39 @@ const DRAW: Record<string, Draw> = {
     p.render(g);
     blob(g, 7.2, 7.0, 0.5, 0.5, '#4a3630'); blob(g, 5.9, 6.0, 0.35, 0.35, '#4a3630');
   },
+  tabCiv: g => {
+    const p = new Painter(0.45);
+    p.poly([1.0, 8.6, 1.0, 3.2, 3.2, 5.6, 5.0, 1.6, 6.8, 5.6, 9.0, 3.2, 9.0, 8.6], volume('#ffd23c', 5, 5, 5, 0.4, 0.8));
+    p.render(g);
+    blob(g, 5.0, 7.0, 0.8, 0.8, '#e8443a'); blob(g, 2.6, 7.2, 0.55, 0.55, '#3a7be8'); blob(g, 7.4, 7.2, 0.55, 0.55, '#2ec4b6');
+  },
+  war: g => {
+    const p = new Painter(0.45);
+    for (const s of [1, -1]) {
+      const x0 = 5 - s * 3.6, x1 = 5 + s * 3.2;
+      p.line([x0, 1.2, x1, 7.8], 1.0, '#d8dde2');
+      p.line([5 + s * 1.6, 5.4, 5 + s * 3.8, 7.6], 0.8, '#b8862a');
+      p.line([x1, 7.8, x1 + s * 0.8, 8.8], 0.9, '#8a5a32');
+    }
+    p.render(g);
+  },
+  peace: g => {
+    const p = new Painter(0.45);
+    p.line([6.8, 6.6, 9.2, 8.6], 0.35, '#5a8a3a');
+    p.ell(8.6, 7.4, 0.8, 0.4, '#6cc04a', { rot: 0.6 }).ell(7.6, 8.4, 0.8, 0.4, '#6cc04a', { rot: -0.4 });
+    p.shape(g2 => { g2.moveTo(1.0, 5.6); g2.quadraticCurveTo(3.2, 3.6, 6.4, 4.4); g2.quadraticCurveTo(8.2, 3.2, 8.6, 4.6); g2.lineTo(7.6, 5.2); g2.quadraticCurveTo(6.8, 7.8, 3.6, 7.2); g2.quadraticCurveTo(2.0, 6.8, 1.0, 5.6); }, volume('#ffffff', 5, 5, 4, 0.2, 0.85));
+    p.shape(g2 => { g2.moveTo(3.6, 5.2); g2.quadraticCurveTo(4.0, 1.2, 6.8, 0.8); g2.quadraticCurveTo(6.2, 3.8, 5.6, 5.4); g2.closePath(); }, '#eef2f6', { sep: true });
+    p.poly([8.5, 4.5, 9.6, 4.9, 8.4, 5.1], '#f2a61e');
+    p.render(g);
+    blob(g, 7.7, 4.4, 0.25, 0.25, INK);
+  },
+  kingdoms: g => {
+    const p = new Painter(0.45);
+    p.line([2.0, 9.4, 2.0, 0.8], 0.5, '#6a4424');
+    p.shape(g2 => { g2.moveTo(2.2, 1.0); g2.quadraticCurveTo(5, 0.2, 8.8, 1.4); g2.lineTo(8.8, 5.4); g2.quadraticCurveTo(5, 4.4, 2.2, 5.2); g2.closePath(); }, volume('#e8443a', 5, 3, 4, 0.35, 0.8));
+    p.render(g);
+    blob(g, 5.4, 3.0, 1.0, 1.0, '#ffd23c');
+  },
   inspect: g => {
     const p = new Painter(0.45);
     p.line([6.2, 6.2, 9.0, 9.0], 1.3, '#c8883a');

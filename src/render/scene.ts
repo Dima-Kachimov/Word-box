@@ -16,6 +16,7 @@ import { tornados, meteors, bolts, waves } from '../sim/events';
 import type { Tornado, Meteor } from '../sim/events';
 import { INK, TAU } from './cartoon';
 import { drawAnimals, drawFireflies } from '../creatures/render';
+import { drawUnits, drawCityLabels, drawCivLights } from '../civ/render';
 import { uiState } from '../ui/state';
 import { shotCd } from '../sim/tools';
 
@@ -59,6 +60,7 @@ export function render(): void {
   }
 
   drawAnimals(ox, oy, z, 'ground');
+  drawUnits(ctx, ox, oy, z);
 
   // смерчі
   for (const t of tornados) drawTornado(ctx, t, ox, oy, z);
@@ -97,6 +99,7 @@ export function render(): void {
       ctx.drawImage(glowSpr, ox + lights[k] * z - size / 2, oy + lights[k + 1] * z - size / 2, size, size);
     }
     for (const m of meteors) { ctx.globalAlpha = ga; ctx.drawImage(glowSpr, ox + (m.x - 12) * z, oy + (m.y - 12) * z, 24 * z, 24 * z); }
+    drawCivLights(ctx, glowSpr, ox, oy, z, ga);
     drawFireflies(ox, oy, z, clock.dark);
     ctx.globalAlpha = 1;
     ctx.globalCompositeOperation = 'source-over';
@@ -113,6 +116,8 @@ export function render(): void {
     }
   }
   if (clock.flash > 0.01) { ctx.fillStyle = `rgba(235,240,255,${clock.flash})`; ctx.fillRect(0, 0, canvas.width, canvas.height); clock.flash *= 0.8; }
+
+  drawCityLabels(ctx, ox, oy, z, performance.now());
 
   if (uiState.cursor) {
     ctx.strokeStyle = 'rgba(255,255,255,0.75)';

@@ -12,6 +12,7 @@ import { markDirty } from '../render/buffer';
 import { burst, smokeAt, steamAt, addP } from './particles';
 import { SFX } from '../audio/sfx';
 import { animals, kill } from '../creatures/animal';
+import { hurtUnitsAt } from '../civ/units';
 
 export interface Bolt { pts: [number, number][]; br: [number, number][]; life: number; }
 export interface Meteor { sx: number; sy: number; ex: number; ey: number; x: number; y: number; t: number; tx: number; ty: number; }
@@ -40,6 +41,7 @@ export function strike(tx: number, ty: number, natural: boolean): void {
   clock.flash = Math.max(clock.flash, natural ? 0.3 : 0.45);
   SFX.thunder(natural ? 0.2 + rnd() * 0.6 : 0);
   for (const a of animals) if (!a.dead && a.S.kind !== 'sky' && Math.hypot(a.x - tx, a.y - ty) < 1.1) kill(a, 'burn');
+  hurtUnitsAt(tx, ty, 1.1, 'burn');
   burst('spark', bx, by, 12, 1.2, ['#fffbe0', '#ffe45c', '#bcd4ff'], 14);
   const cx = Math.floor(tx), cy = Math.floor(ty);
   for (let dy = -1; dy <= 1; dy++) for (let dx = -1; dx <= 1; dx++) {
@@ -91,6 +93,7 @@ function impact(cx: number, cy: number): void {
     if (d < 3.8) kill(a, 'burn');
     else if (d < 8 && a.S.kind !== 'sea') { a.state = 'tossed'; a.z = 1; a.vz = 1.2 + rnd(); a.vx = dx / d * 0.15; a.vy = dy / d * 0.15; }
   }
+  hurtUnitsAt(cx + 0.5, cy + 0.5, 4.2, 'burn');
   waves.push({ x: bx, y: by, r: 2, life: 28, max: 28 });
   if (inWater) {
     burst('debris', bx, by, 70, 2.2, ['#dff2ff', '#9fd4ff', '#ffffff'], 40);
@@ -142,6 +145,10 @@ export function updateEntities(frame: number): void {
         if (world.cover[i] === C_TREE && rnd() < 0.25) {
           world.cover[i] = C_NONE;
           for (let n = 0; n < 4; n++) { const a2 = rnd() * Math.PI * 2; addP('leaf', x * SUB + 2, y * SUB + 2, Math.cos(a2) * 1.2, Math.sin(a2) * 0.8, 40 + rnd() * 20, { c: LEAVES[(rnd() * 4) | 0], drag: 0.96 }); }
+        } else if (world.bld[i] && rnd() < 0.1) {
+          // смерч розносить будинки на дошки
+          world.bld[i] = 0;
+          burst('debris', x * SUB + 3, y * SUB + 2, 10, 1.4, ['#8a5a32', '#d8434b', '#f4e2c0', '#6a6e74'], 40);
         } else if (world.cover[i] === C_FIRE && rnd() < 0.15) {
           const j = Math.max(0, Math.min(y + ((rnd() * 5) | 0) - 2, world.H - 1)) * world.W + Math.max(0, Math.min(x + ((rnd() * 5) | 0) - 2, world.W - 1));
           if (world.cover[j] === C_TREE) { world.cover[j] = C_FIRE; world.timer[j] = 30; }
@@ -149,6 +156,7 @@ export function updateEntities(frame: number): void {
         if (world.snow[i] > 0) world.snow[i] = Math.max(0, world.snow[i] - 40);
         if (world.hgt[i] < SEA && rnd() < 0.1) addP('debris', x * SUB + 2, y * SUB + 2, (rnd() - 0.5) * 1.5, -rnd() * 1.5, 20, { c: '#dff2ff', drag: 0.94 });
       }
+      if (rnd() < 0.3) hurtUnitsAt(t.x, t.y, 1.3, 'crush');
       markDirty();
     }
     t.lastFrame = frame;

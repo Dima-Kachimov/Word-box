@@ -81,6 +81,8 @@ export function allocateGrid(W: number, H: number): void {
   world.biome = new Uint8Array(N);
   world.snow = new Uint16Array(N);
   world.grazed = new Uint16Array(N);
+  world.bld = new Uint8Array(N);
+  world.owner = new Int16Array(N);
   world.BW = W * SUB;
   world.BH = H * SUB;
   // базова площа — світ розміром з екран телефона (~165×300 клітинок)
@@ -108,7 +110,7 @@ export function generateTerrain(): void {
     t = (0.5 + (t - 0.5) * 1.8) * 0.65 + (y / (H - 1)) * 0.5 - 0.08;
     world.temp[i] = clamp(t, 0, 1);
     world.moist[i] = clamp(0.5 + (fbm(x / 22, y / 22, seed + 400, 4) - 0.5) * 1.9, 0, 1);
-    world.cover[i] = C_NONE; world.timer[i] = 0; world.wet[i] = 0; world.snow[i] = 0; world.grazed[i] = 0;
+    world.cover[i] = C_NONE; world.timer[i] = 0; world.wet[i] = 0; world.snow[i] = 0; world.grazed[i] = 0; world.bld[i] = 0; world.owner[i] = 0;
     world.vari[i] = rnd();
   }
   for (let i = 0; i < N; i++) world.biome[i] = calcBiome(i);

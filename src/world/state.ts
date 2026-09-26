@@ -42,6 +42,10 @@ export interface WorldState {
   snow: Uint16Array;
   /** Лічильник "витоптано/з'їдено" — трава тимчасово не росте й не годує. */
   grazed: Uint16Array;
+  /** Будівля в клітинці: 0 — немає, інакше код civ/buildings.ts (раса × тип). */
+  bld: Uint8Array;
+  /** Власник клітинки (територія): id міста + 1, 0 — нічия. */
+  owner: Int16Array;
 
 }
 
@@ -57,7 +61,9 @@ export const world: WorldState = {
   moist: new Float32Array(0),
   biome: new Uint8Array(0),
   snow: new Uint16Array(0),
-  grazed: new Uint16Array(0)
+  grazed: new Uint16Array(0),
+  bld: new Uint8Array(0),
+  owner: new Int16Array(0)
 };
 
 /**

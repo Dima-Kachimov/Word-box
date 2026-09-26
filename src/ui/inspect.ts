@@ -4,6 +4,7 @@
 import { creatureState, DEATH } from '../creatures/animal';
 import { STATE_TXT } from '../creatures/render';
 import { SPECIES } from '../creatures/species';
+import { civInspectHtml } from './civPanel';
 
 const inspEl = document.getElementById('insp')!;
 
@@ -13,6 +14,8 @@ function bar(v: number, color: string): string {
 }
 
 export function updateInspect(): void {
+  const civ = civInspectHtml();
+  if (civ) { inspEl.style.display = 'block'; inspEl.innerHTML = civ; return; }
   const a = creatureState.selected;
   if (!a) { inspEl.style.display = 'none'; return; }
   inspEl.style.display = 'block';

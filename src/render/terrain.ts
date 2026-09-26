@@ -11,6 +11,7 @@ import { world, heightDirty } from '../world/state';
 import { SUB, SEA, DEEP, SAND, GRASS, HILL, ROCK } from '../world/constants';
 import { terrainColor, col } from './palette';
 import { classifyBiome } from '../world/generate';
+import { markCells } from './dirty';
 
 export const terrainLayer = {
   canvas: null as unknown as HTMLCanvasElement,
@@ -189,5 +190,6 @@ export function updateTerrain(): void {
   const px1 = Math.min(W - 1, cx1 + 1), py1 = Math.min(H - 1, cy1 + 1);
   renderPixels(px0, py0, px1, py1);
   terrainLayer.ctx.putImageData(terrainLayer.img, 0, 0, px0 * SUB, py0 * SUB, (px1 - px0 + 1) * SUB, (py1 - py0 + 1) * SUB);
+  markCells(px0, py0, px1, py1);
   heightDirty.x0 = 0; heightDirty.y0 = 0; heightDirty.x1 = -1; heightDirty.y1 = -1;
 }
