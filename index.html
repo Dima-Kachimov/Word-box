@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<title>Пісочниця Творця</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/src/style.css">
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>ПІСОЧНИЦЯ<br>ТВОРЦЯ</h1>
+    <div class="hbtns">
+      <button class="hbtn" id="panBtn" title="Рухати карту">✋</button>
+      <button class="hbtn" id="brushBtn" title="Розмір пензля">M</button>
+      <button class="hbtn on" id="dayBtn" title="День і ніч">☀</button>
+      <button class="hbtn" id="soundBtn" title="Звук">🔊</button>
+      <button class="hbtn" id="pauseBtn" title="Пауза">❚❚</button>
+      <button class="hbtn" id="saveBtn" title="Зберегти світ">💾</button>
+      <button class="hbtn" id="loadBtn" title="Завантажити світ">📂</button>
+      <button class="hbtn" id="regenBtn" title="Новий світ">↻</button>
+    </div>
+  </header>
+  <div id="canvasWrap">
+    <canvas id="world"></canvas>
+    <div id="toast"></div>
+    <div id="insp"></div>
+    <div id="hud"><span id="timeLbl">☀ 12:00</span><span>Вітер <span id="windArrow">➤</span></span><span id="animalLbl">🐾 0</span></div>
+  </div>
+  <footer>
+    <div class="tabs" id="tabs"></div>
+    <div class="tools" id="toolbar"></div>
+  </footer>
+</div>
+<input type="file" id="loadFile" accept="application/json" style="display:none">
+<script type="module" src="/src/main.ts"></script>
+</body>
+</html>
