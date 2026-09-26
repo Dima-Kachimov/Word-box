@@ -5,7 +5,8 @@ import { clock } from '../sim/clock';
 import { camera, zoomAt } from '../render/camera';
 import { view } from '../render/context';
 import { fitCamera } from '../render/camera';
-import { regenerateWorld } from '../sim/worldLifecycle';
+import { newWorld } from '../sim/worldLifecycle';
+import type { WorldSize } from '../world/generate';
 import { animals } from '../creatures/animal';
 import { uiState } from './state';
 import { initAudio, setSoundOn, audioState } from '../audio/engine';
@@ -28,6 +29,17 @@ export function syncHeaderButtons(): void {
   if (dayBtn) dayBtn.classList.toggle('on', clock.dayCycle);
   if (pauseBtn) { pauseBtn.textContent = clock.paused ? '▶' : '❚❚'; pauseBtn.classList.toggle('on', clock.paused); }
   if (soundBtn) soundBtn.textContent = audioState.soundOn ? '🔊' : '🔇';
+}
+
+const SIZE_KEY = 'godsim-world-size';
+
+/** Розмір світу, обраний минулого разу (або "Великий"). */
+export function savedWorldSize(): WorldSize {
+  try {
+    const v = localStorage.getItem(SIZE_KEY);
+    if (v === 'S' || v === 'M' || v === 'L') return v;
+  } catch { /* localStorage недоступний */ }
+  return 'L';
 }
 
 export function initHud(): void {
@@ -55,11 +67,24 @@ export function initHud(): void {
     pauseBtn.classList.toggle('on', clock.paused);
   });
 
+  // "Новий світ": меню з вибором розміру (поточний підсвічено)
+  const menu = document.getElementById('sizeMenu')!;
+  const sizeBtns = [...menu.querySelectorAll<HTMLButtonElement>('[data-size]')];
   document.getElementById('regenBtn')!.addEventListener('click', () => {
-    regenerateWorld();
+    sizeBtns.forEach(b => b.classList.toggle('on', b.dataset.size === uiState.worldSize));
+    menu.hidden = !menu.hidden;
+  });
+  menu.querySelector('.menuCancel')!.addEventListener('click', () => { menu.hidden = true; });
+  sizeBtns.forEach(b => b.addEventListener('click', () => {
+    menu.hidden = true;
+    uiState.worldSize = b.dataset.size as WorldSize;
+    try { localStorage.setItem(SIZE_KEY, uiState.worldSize); } catch { /* приватний режим — просто не запам'ятаємо */ }
+    const wrap = document.getElementById('canvasWrap')!;
+    newWorld(wrap.clientWidth, wrap.clientHeight, uiState.worldSize);
     fitCamera();
     zoomAt(view.canvas.width / 2, view.canvas.height / 2, camera.minZoom);
-  });
+    showToast(b.textContent + ' світ', 1200);
+  }));
 
   soundBtn = document.getElementById('soundBtn') as HTMLButtonElement;
   soundBtn.addEventListener('click', () => {

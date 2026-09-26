@@ -115,3 +115,24 @@ footer {
 .tool span { font-size: 10.5px; letter-spacing: -0.2px; line-height: 1.2; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tool.active, .tab.active { background: var(--accent); color: var(--ink); }
 .tool:focus-visible, .hbtn:focus-visible, .tab:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+
+/* меню "Новий світ" */
+#sizeMenu {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  background: var(--glass); border: 2.5px solid var(--ink); border-radius: 18px;
+  box-shadow: 0 4px 0 var(--ink);
+  padding: 14px 14px 12px; display: flex; flex-direction: column; align-items: center; gap: 10px;
+  z-index: 5;
+}
+#sizeMenu[hidden] { display: none; }
+.menuTitle { font-family: 'Rubik', 'Nunito', sans-serif; font-weight: 900; font-size: 17px; }
+.menuRow { display: flex; gap: 7px; }
+.menuBtn {
+  font-family: inherit; font-weight: 800; font-size: 14px; color: var(--text); cursor: pointer;
+  background: var(--panel); border: 2.5px solid var(--ink); border-radius: 12px;
+  box-shadow: 0 3px 0 var(--ink); padding: 8px 12px;
+  transition: transform .06s, box-shadow .06s;
+}
+.menuBtn:active { transform: translateY(2px); box-shadow: 0 1px 0 var(--ink); }
+.menuBtn.on { background: var(--accent); color: var(--ink); }
+.menuCancel { background: var(--panel-3); font-size: 13px; padding: 6px 14px; }

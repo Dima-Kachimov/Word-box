@@ -3,6 +3,8 @@
 // (щоб render/scene.ts міг читати uiState.tool/cursor, не створюючи циклів
 // імпортів з ui/input.ts, який сам залежить від камери й тулів).
 
+import type { WorldSize } from '../world/generate';
+
 export type InputMode = 'idle' | 'paint' | 'pan' | 'pinch';
 
 export interface ScreenPoint { x: number; y: number; }
@@ -16,5 +18,7 @@ export const uiState = {
   painting: false,
   cursor: null as ScreenPoint | null,
   lastPos: null as ScreenPoint | null,
-  lastShot: 0
+  lastShot: 0,
+  /** Розмір світу для наступної генерації (запам'ятовується в localStorage). */
+  worldSize: 'L' as WorldSize
 };

@@ -40,18 +40,25 @@ export function setH(i: number, v: number): void {
   markHeightDirtyCell(i);
 }
 
+/** Розміри світу: у скільки разів сторона світу більша за екран. */
+export const WORLD_SIZES = { S: 1, M: 1.5, L: 2 } as const;
+export type WorldSize = keyof typeof WORLD_SIZES;
+/** Найбільша площа текстури світу в пікселях — щоб не вийти за ліміти canvas на телефонах. */
+const MAX_PX = 7.5e6;
+
 /**
- * Виділяє сітку клітинок під переданий розмір вʼюпорта. Викликається один раз
- * при старті — розмір сітки після цього не змінюється (як і в оригіналі: resize
- * вікна не перегенеровує світ, лише масштабує камеру).
+ * Виділяє сітку клітинок під розмір вʼюпорта й обраний розмір світу.
+ * Щільність клітинок на екрані при "вписаному" масштабі — як у оригіналі
+ * (дільник 2.5), а `size` робить світ у кілька разів більшим за екран: його
+ * тоді роздивляються, наближаючи й рухаючи камеру. Зміна розміру вікна не
+ * перегенеровує світ, лише масштабує камеру.
  */
-export function setupWorldGrid(viewportW: number, viewportH: number): void {
-  // Дільник і межі підібрані вдвічі щільніше за оригінал (4.2 → 2.5, 80..200
-  // → 130..330), щоб клітинки рельєфу були помітно дрібнішими — суцільні
-  // "великі квадрати" біома перестають бути видимими навіть при наближенні,
-  // ближче до щільної піксель-арт сітки WorldBox.
-  const W = clamp(Math.round(viewportW / 2.5), 130, 330);
-  const H = clamp(Math.round(W * viewportH / viewportW), 100, 500);
+export function setupWorldGrid(viewportW: number, viewportH: number, size: WorldSize = 'L'): void {
+  const k = WORLD_SIZES[size];
+  let W = clamp(Math.round(viewportW / 2.5 * k), 130, 720);
+  let H = clamp(Math.round(W * viewportH / viewportW), 100, 1100);
+  const f = Math.sqrt(MAX_PX / (W * H * SUB * SUB));
+  if (f < 1) { W = Math.round(W * f); H = Math.round(H * f); }
   allocateGrid(W, H);
 }
 
@@ -76,6 +83,8 @@ export function allocateGrid(W: number, H: number): void {
   world.grazed = new Uint16Array(N);
   world.BW = W * SUB;
   world.BH = H * SUB;
+  // базова площа — світ розміром з екран телефона (~165×300 клітинок)
+  world.popK = clamp(N / 50000, 1, 4);
   markHeightDirtyAll();
 }
 

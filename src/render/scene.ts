@@ -167,9 +167,22 @@ function drawTornado(ctx: CanvasRenderingContext2D, t: Tornado, ox: number, oy: 
 }
 
 /** Метеорит: палаючий хвіст-крапля і камінь з контуром. */
-function drawMeteor(ctx: CanvasRenderingContext2D, m: Meteor, ox: number, oy: number, z: number): void {
+function drawMeteor(ctx: CanvasRenderingContext2D, m: Meteor, ox: number, oy: number, zc: number): void {
+  // позиції — у масштабі камери, а розмір — не менший за "читабельний" на
+  // екрані, щоб метеорит і мішень було видно навіть на всьому великому світі
+  const z = Math.max(zc, 1.4 * camera.dpr);
   const dx = m.ex - m.sx, dy = m.ey - m.sy, L = Math.hypot(dx, dy) || 1, ux = dx / L, uy = dy / L;
-  const hx = ox + m.x * z, hy = oy + m.y * z, len = 26 * K * z, r = 2 * K * z;
+  const hx = ox + m.x * zc, hy = oy + m.y * zc, len = 26 * K * z, r = 2 * K * z;
+  // мішень у точці падіння — видно, куди летить метеорит
+  const tx0 = ox + m.ex * zc, ty0 = oy + m.ey * zc, pulse = 1 + 0.15 * Math.sin(m.t * 40);
+  ctx.globalAlpha = 0.85; ctx.lineWidth = Math.max(2, 0.7 * z);
+  for (const [col, w] of [[INK, ctx.lineWidth * 2.2], ['#ff5a3c', ctx.lineWidth]] as const) {
+    ctx.strokeStyle = col; ctx.lineWidth = w;
+    ctx.beginPath(); ctx.ellipse(tx0, ty0, 5 * K * z * pulse, 2.6 * K * z * pulse, 0, 0, TAU); ctx.stroke();
+    ctx.beginPath(); ctx.ellipse(tx0, ty0, 2 * K * z * pulse, 1 * K * z * pulse, 0, 0, TAU); ctx.stroke();
+  }
+  ctx.lineWidth = Math.max(2, 0.7 * z);
+  ctx.globalAlpha = 1;
   ctx.globalAlpha = 0.8;
   ctx.drawImage(glowSpr, hx - 7 * K * z, hy - 7 * K * z, 14 * K * z, 14 * K * z);
   ctx.globalAlpha = 1;

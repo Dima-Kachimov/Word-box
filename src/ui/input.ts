@@ -36,6 +36,7 @@ export function initInput(canvas: HTMLCanvasElement): void {
     try { canvas.setPointerCapture(e.pointerId); } catch { /* деякі браузери на touch кидають тут — ігноруємо */ }
     if (ptrs.size === 2) {
       if (pendingTimer) clearTimeout(pendingTimer);
+      pendingTimer = null;
       uiState.painting = false; uiState.cursor = null;
       const [a, b] = [...ptrs.values()];
       pinch = { d: Math.max(10, dist(a, b)), z: camera.zoom, m: mid(a, b), cx: camera.camX, cy: camera.camY };
@@ -47,7 +48,7 @@ export function initInput(canvas: HTMLCanvasElement): void {
     if (uiState.panMode || e.button === 1 || e.button === 2) { mode = 'pan'; return; }
     mode = 'paint';
     if (e.pointerType === 'mouse') startPainting(p);
-    else pendingTimer = setTimeout(() => { if (mode === 'paint' && lastPos) startPainting(lastPos); }, 80);
+    else pendingTimer = setTimeout(() => { pendingTimer = null; if (mode === 'paint' && lastPos) startPainting(lastPos); }, 80);
   });
 
   canvas.addEventListener('pointermove', e => {
@@ -74,7 +75,11 @@ export function initInput(canvas: HTMLCanvasElement): void {
   const endPtr = (e: PointerEvent): void => {
     ptrs.delete(e.pointerId);
     if (ptrs.size === 0) {
+      // Швидкий тап: палець підняли раніше, ніж спрацювала затримка "чи це не
+      // pinch" — дія все одно має відбутися (тварина, метеорит, блискавка…).
+      if (pendingTimer && mode === 'paint' && !uiState.painting && lastPos && e.type === 'pointerup') startPainting(lastPos);
       if (pendingTimer) clearTimeout(pendingTimer);
+      pendingTimer = null;
       mode = 'idle'; uiState.painting = false;
       if (e.pointerType !== 'mouse') uiState.cursor = null;
     } else if (mode === 'pinch') mode = 'idle';

@@ -17,6 +17,8 @@ export interface WorldState {
   BH: number;
   /** Насіння генератора шуму для поточного світу. */
   seed: number;
+  /** Множник популяцій: у більшому світі тварин і хмар більше (≥1). */
+  popK: number;
 
   /** Висота рельєфу 0..1. */
   hgt: Float32Array;
@@ -44,7 +46,7 @@ export interface WorldState {
 }
 
 export const world: WorldState = {
-  W: 0, H: 0, N: 0, BW: 0, BH: 0, seed: 0,
+  W: 0, H: 0, N: 0, BW: 0, BH: 0, seed: 0, popK: 1,
   hgt: new Float32Array(0),
   cover: new Uint8Array(0),
   timer: new Int16Array(0),

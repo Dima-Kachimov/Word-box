@@ -25,7 +25,7 @@ export const creatureState = {
 };
 
 export function spawnAnimal(k: string, x: number, y: number, extra?: Partial<Animal>): Animal | null {
-  if (animals.length >= 600) return null;
+  if (animals.length >= 600 * Math.min(world.popK, 1.6)) return null;
   const S = SPECIES[k];
   const a: Animal = {
     S, x, y, vx: 0, vy: 0, dir: rnd() < 0.5 ? -1 : 1, t: rnd() * 10, timer: 0,
@@ -84,14 +84,13 @@ export function populate(): void {
   for (const k in SPECIES) {
     const S = SPECIES[k];
     if (S.kind === 'sky' || !S.init) continue;
-    for (let g = 0; g < S.init; g++) {
+    for (let g = 0, n = Math.round(S.init * world.popK); g < n; g++) {
       const p = randomTile(i => canBe(S, i) && (S.kind !== 'land' || world.hgt[i] >= SEA || !!S.lurker) && (!S.biomes || S.biomes.includes(world.biome[i])));
       if (!p) break;
       spawnGroup(k, p.x, p.y, S.group || 1);
     }
   }
-  spawnFlockEdge('bird', 6);
-  spawnFlockEdge('gull', 3);
+  for (let q = 0; q < Math.round(world.popK); q++) { spawnFlockEdge('bird', 6); spawnFlockEdge('gull', 3); }
   const p = randomTile(i => world.hgt[i] >= SEA);
   if (p) spawnAnimal('eagle', p.x, p.y, { cx: p.x, cy: p.y, hunger: 0.3 });
 }

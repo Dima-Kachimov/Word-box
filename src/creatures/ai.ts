@@ -54,7 +54,7 @@ export function findMate(a: Animal): Animal | null {
     const d = (b.x - a.x) ** 2 + (b.y - a.y) ** 2;
     if (d < bd) { bd = d; best = b; }
   }
-  return cnt < a.S.cap ? best : null;
+  return cnt < a.S.cap * world.popK ? best : null;
 }
 
 export function breed(a: Animal, p: Animal): void {
@@ -433,7 +433,7 @@ function manageAnimals(): void {
   }
   if (clock.dark > 0.35) {
     if (c('bat') < 12 && rnd() < 0.4) { const p = randomTile(i => world.hgt[i] >= GRASS); if (p) for (let q = 0; q < 3; q++) spawnAnimal('bat', p.x + rnd() * 2, p.y + rnd() * 2, { hx: p.x, hy: p.y, auto: true }); }
-    if (c('firefly') < 40 && rnd() < 0.8) {
+    if (c('firefly') < 40 * world.popK && rnd() < 0.8) {
       const p = randomTile(i => world.cover[i] === C_TREE && (world.biome[i] === B_TEMP || world.biome[i] === B_SWAMP || world.biome[i] === B_JUNGLE));
       if (p) for (let q = 0; q < 4; q++) spawnAnimal('firefly', p.x + rnd() * 3 - 1.5, p.y + rnd() * 3 - 1.5, { hx: p.x, hy: p.y, auto: true });
     }
@@ -443,7 +443,7 @@ function manageAnimals(): void {
       const S = SPECIES[k];
       if (S.kind !== 'sea' && S.kind !== 'beach') continue;
       const n = c(k);
-      if (n < 2 || n >= S.cap || rnd() > (S.breed || 0)) continue;
+      if (n < 2 || n >= S.cap * world.popK || rnd() > (S.breed || 0)) continue;
       const pool = animals.filter(a => a.S === S && !a.dead);
       const par = pool[(rnd() * pool.length) | 0];
       if (!par || (S.eats && par.hunger > 0.6)) continue;

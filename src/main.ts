@@ -20,7 +20,8 @@ import { creatureState } from './creatures/animal';
 import { audioState } from './audio/engine';
 import { audioTick, ambientSfx, animalVoices } from './audio/ambient';
 import { initToast, showToast } from './ui/toast';
-import { initHud, updateHud } from './ui/hud';
+import { initHud, updateHud, savedWorldSize } from './ui/hud';
+import { uiState } from './ui/state';
 import { initTabs } from './ui/tabs';
 import { initInput, continuousPaint } from './ui/input';
 import { updateInspect } from './ui/inspect';
@@ -35,7 +36,8 @@ initTabs(document.getElementById('tabs')!, document.getElementById('toolbar')!, 
 initInput(canvas);
 
 sizeCanvas(wrap);
-initWorld(wrap.clientWidth, wrap.clientHeight);
+uiState.worldSize = savedWorldSize();
+initWorld(wrap.clientWidth, wrap.clientHeight, uiState.worldSize);
 fitCamera();
 zoomAt(view.canvas.width / 2, view.canvas.height / 2, camera.minZoom);
 

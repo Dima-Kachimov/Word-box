@@ -115,7 +115,7 @@ export function updateClouds(): void {
       if (cl.x < -80 || cl.y < -80 || cl.x > world.BW + 80 || cl.y > world.BH + 80) { clouds.splice(k, 1); ambient--; }
     }
   }
-  if (ambient < 4 && rnd() < 0.01) spawnAmbientCloud(false);
+  if (ambient < Math.round(4 * world.popK) && rnd() < 0.01) spawnAmbientCloud(false);
 }
 
 export function weatherTick(): void {
@@ -140,5 +140,5 @@ export function weatherTick(): void {
       }
     }
   }
-  if (clouds.filter(c => c.storm).length < 2 && rnd() < 0.003) spawnStorm(rnd() * world.W, rnd() * world.H);
+  if (clouds.filter(c => c.storm).length < Math.round(2 * world.popK) && rnd() < 0.003) spawnStorm(rnd() * world.W, rnd() * world.H);
 }
