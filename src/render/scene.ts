@@ -27,13 +27,17 @@ const glowSpr: HTMLCanvasElement = (() => {
 export function render(): void {
   const ctx = view.ctx, canvas = view.canvas;
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-  ctx.imageSmoothingEnabled = false;
   ctx.fillStyle = 'rgb(18,44,102)';
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   const shx = clock.shake ? (rnd() - 0.5) * clock.shake : 0, shy = clock.shake ? (rnd() - 0.5) * clock.shake : 0;
   clock.shake *= 0.86; if (clock.shake < 0.3) clock.shake = 0;
   const ox = Math.round(camera.camX + shx), oy = Math.round(camera.camY + shy), z = camera.zoom;
+  // Рельєф масштабується зі згладжуванням — м'які переходи кольору замість
+  // чітких квадратів (менш "ретро-піксельний", ближче до мультяшного вигляду
+  // WorldBox). Персонажі/UI-спрайти нижче навмисно лишаються різкими.
+  ctx.imageSmoothingEnabled = true;
   ctx.drawImage(tileBuffer.canvas, ox, oy, Math.round(world.BW * z), Math.round(world.BH * z));
+  ctx.imageSmoothingEnabled = false;
 
   // тіні хмар
   for (const cl of clouds) {
