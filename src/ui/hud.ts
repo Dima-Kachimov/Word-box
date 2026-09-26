@@ -58,7 +58,7 @@ export function initHud(): void {
   document.getElementById('regenBtn')!.addEventListener('click', () => {
     regenerateWorld();
     fitCamera();
-    zoomAt(view.canvas.width / 2, view.canvas.height / 2, camera.zoom * 1.5);
+    zoomAt(view.canvas.width / 2, view.canvas.height / 2, camera.minZoom);
   });
 
   soundBtn = document.getElementById('soundBtn') as HTMLButtonElement;
@@ -80,7 +80,7 @@ export function initHud(): void {
     const ok = loadFromLocalStorage();
     showToast(ok ? 'Світ завантажено' : 'Немає збереження', 1400);
     if (ok) {
-      fitCamera(); zoomAt(view.canvas.width / 2, view.canvas.height / 2, camera.zoom * 1.5);
+      fitCamera(); zoomAt(view.canvas.width / 2, view.canvas.height / 2, camera.minZoom);
       syncHeaderButtons();
     }
   });

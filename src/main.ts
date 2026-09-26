@@ -37,7 +37,7 @@ initInput(canvas);
 sizeCanvas(wrap);
 initWorld(wrap.clientWidth, wrap.clientHeight);
 fitCamera();
-zoomAt(view.canvas.width / 2, view.canvas.height / 2, camera.zoom * 1.5);
+zoomAt(view.canvas.width / 2, view.canvas.height / 2, camera.minZoom);
 
 window.addEventListener('resize', () => {
   sizeCanvas(wrap);
