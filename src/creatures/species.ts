@@ -134,7 +134,7 @@ for (const k in SPECIES) {
 export function getSpeciesIcon(key: string, n = 48): HTMLCanvasElement {
   const S = SPECIES[key], A = ART[key];
   const c = document.createElement('canvas'); c.width = c.height = n;
-  const s = (n - 4) / (Math.max(A.w, A.h) + ART_PAD * 2);
+  const s = n / (Math.max(A.w, A.h) + 1.6);
   S.imgs[0][0].blit(c.getContext('2d')!, (n - A.w * s) / 2, (n - A.h * s) / 2, s);
   return c;
 }

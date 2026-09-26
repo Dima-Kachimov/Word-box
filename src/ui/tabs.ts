@@ -1,7 +1,7 @@
 // Нижня панель: вкладки категорій інструментів + сітка кнопок інструментів
 // поточної вкладки.
 
-import { ICONS, iconCanvas } from './icons';
+import { hasIcon, iconCanvas } from './icons';
 import { getSpeciesIcon } from '../creatures/species';
 import { creatureState } from '../creatures/animal';
 import { uiState } from './state';
@@ -43,7 +43,7 @@ export function initTabs(tabs: HTMLElement, toolbar: HTMLElement, onInspectClear
 }
 
 function iconFor(id: string): HTMLCanvasElement {
-  return ICONS[id] ? iconCanvas(ICONS[id]) : getSpeciesIcon(id);
+  return hasIcon(id) ? iconCanvas(id) : getSpeciesIcon(id, 56);
 }
 
 function buildTabs(): void {
