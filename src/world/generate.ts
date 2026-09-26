@@ -40,8 +40,12 @@ export function setH(i: number, v: number): void {
  * вікна не перегенеровує світ, лише масштабує камеру).
  */
 export function setupWorldGrid(viewportW: number, viewportH: number): void {
-  const W = clamp(Math.round(viewportW / 4.2), 80, 200);
-  const H = clamp(Math.round(W * viewportH / viewportW), 60, 300);
+  // Дільник і межі підібрані вдвічі щільніше за оригінал (4.2 → 2.5, 80..200
+  // → 130..330), щоб клітинки рельєфу були помітно дрібнішими — суцільні
+  // "великі квадрати" біома перестають бути видимими навіть при наближенні,
+  // ближче до щільної піксель-арт сітки WorldBox.
+  const W = clamp(Math.round(viewportW / 2.5), 130, 330);
+  const H = clamp(Math.round(W * viewportH / viewportW), 100, 500);
   allocateGrid(W, H);
 }
 
